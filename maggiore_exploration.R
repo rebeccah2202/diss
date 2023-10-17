@@ -5,19 +5,19 @@ library(ggplot2)
 library(tidyverse)
 
 # 2019----
-maggiore_ <- read.csv("data/maggiore4.csv")
+maggiore_ <- read.csv("data/maggiore_8.3.csv")
 maggiore2 <- subset(maggiore_, select = c(lat, lon, time, chla_mean, chla_uncertainty))
 
 # I realised a lot of the data was from around the lake which caused a lot of confusion
 # this is how to filter it out:
-maggiore3 <- filter(maggiore2, chla_mean < 30)
-# a lake cannot have a higher chla concentration than 30 mg/m3
+maggiore3 <- filter(maggiore2, chla_mean < 1000)
+# a lake cannot have a higher chla concentration than 1000 mg/m3
 
 # visualising data from august 2019 to compare to visualisation online
-(prelim_plot <- ggplot(maggiore3, aes(x = lon, y = lat, 
+(prelim_plot <- ggplot(maggiore2, aes(x = lon, y = lat, 
                                     colour = chla_mean)) +
     geom_point()+
-   theme_classic()+
+   theme_classic() +
     scale_colour_steps(low = "#FF3030",
                        high = "#FFD700",
                        breaks = seq(0, 1.2, by = 0.2)))
@@ -46,12 +46,15 @@ maggiore3 <- filter(maggiore2, chla_mean < 30)
 library(gridExtra)
 grid.arrange(plot, plot_uncertainty,ncol = 2)
 
+library(viridisLite)
+library(viridis)
+
 ggplot()+
   geom_raster(data = maggiore3, 
               aes(x = lon, y = lat, fill = chla_mean), interpolate = TRUE)+
   coord_sf(xlim = c(8.4,8.9), ylim = c(45.7,46.2))+
-  scale_fill_gradientn(name = "chla_mean", colours = oce::oceColorsPalette(120))+
-  labs(title = "", x = "", y = "")+
+  scale_fill_gradientn(name = "chla_mean", colours = viridis(10), limits = c(0,3))+
+  labs(title = "", x = "\nlongitude", y = "latitude\n")+
   theme_classic()+
   theme(axis.text = element_text(size = 11, colour = 1),
         legend.key.height = unit(1, "cm"))
@@ -62,7 +65,7 @@ maggiore1_2 <- subset(maggiore1, select = c(lat, lon, time, chla_mean, chla_unce
 maggiore1_3 <- filter(maggiore1_2, chla_mean < 30)
 # a lake cannot have a higher chla concentration than 30 mg/m3
 
-(plot2 <- ggplot(maggiore1_3, aes(x = lon, y = lat, 
+(plot2 <- ggplot(maggiore1_2, aes(x = lon, y = lat, 
                                colour = chla_mean)) +
     geom_point(size=2)+
     theme_classic()+
@@ -82,13 +85,13 @@ grid.arrange(plot2, plot_uncertainty2,ncol = 2)
 
 ggplot()+
   geom_raster(data = maggiore1_3, 
-              aes(x = lon, y = lat, fill = chla_mean), interpolate = TRUE)+
-  coord_sf(xlim = c(8.4,8.9), ylim = c(45.7,46.1))+
-  scale_fill_gradientn(name = "chla_mean", colours = oce::oceColorsPalette(120))+
-  labs(title = "", x = "", y = "")+
+              aes(x = lon, y = lat, fill = chla_mean), interpolate = FALSE)+
+  coord_sf(xlim = c(8.4,8.9), ylim = c(45.7,46.2))+
+  scale_fill_gradientn(name = "chla_mean", colours = viridis(10), limits = c(0,3))+
+  labs(title = "", x = "\nlongitude", y = "latitude\n")+
   theme_classic()+
   theme(axis.text = element_text(size = 11, colour = 1),
-        legend.key.height = unit(1.5, "cm"))
+        legend.key.height = unit(1, "cm"))
 
 
 maggiore_both <- rbind(maggiore_, maggiore1)

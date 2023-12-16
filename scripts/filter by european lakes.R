@@ -6,8 +6,10 @@ library(sf)
 library(scales)
 library(cowplot)
 library(ggthemes)
+library("readxl")
 
 lakes <- read.csv("data/lakes_cci_v2.0.2_product_availability.csv")
+lakes <- lakes
 
 lakes4 <- filter(lakes, lat_min_box > 35, lat_max_box < 72, lon_min_box > -10, lon_max_box < 45)
 lakes4 <- filter(lakes4, !country == "Algeria")
@@ -16,6 +18,16 @@ lakes4 <- filter(lakes4, !country == "Uzbekistan")
 lakes4 <- filter(lakes4, !country == "Kazakhstan")
 lakes4 <- filter(lakes4, !country == "Turkmenistan", !country == "Uzbekistan;Kazakhstan", !country == "Turkmenistan;Uzbekistan", !country == "Azerbaijan",
                  !country == "Iran Islamic Republic of;Azerbaijan", !country == "Iraq", !country == "Syrian Arab Republic")
+
+# remove countries not included in the waterbase
+lakes4 <- filter(lakes4, !country == "Ukraine", !country == "Russian Federation", !country == "Czechia", !country == "Spain",
+                 !country == "Switzerland", !country == "Turkey", !country == "Belarus")
+
+# remove all lakes without a name
+lakes2 <- filter(lakes4, !name == "None")
+
+library(writexl)
+write_xlsx(lakes2,"data\\filteredlakes.xlsx")
 
 
 SHP_0 <- get_eurostat_geospatial(resolution = 10, 
@@ -58,10 +70,6 @@ ggplot() +
   theme(legend.position = 'none') + 
   theme(title = element_text(size = 12))
 
-library(writexl)
-write_xlsx(lakes4,"data\\lakes.xlsx")
-
-lakes2 <- filter(lakes, !name == "None")
 
 ggplot() + 
   geom_polygon(data = worldmap, 

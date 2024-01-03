@@ -6,9 +6,10 @@
 # library
 library(ncdf4)
 library(tidyverse)
+library(dplyr)
 
 # Making a csv file of mean chlorophyll a from nc file of lake maggiore in June 2020 ----
-mag_nc <- nc_open("data/Maggiore_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20200601_to_20200630-fv2.0.2.nc")
+mag_nc <- nc_open("data/Leven/Leven_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20080401_to_20080930-fv2.0.2.nc")
 print(mag_nc)
 
 attributes(mag_nc$var)
@@ -45,7 +46,7 @@ dim(time_obs) # why is the NULL?
 range(time_obs)
 # the range is correct - it is showing from 2020-06-01 GMT to 2020-06-30 GMT
 
-chl_slice <- chl_array[ , , 3] # I chose the 3rd of June because there are values for that day
+chl_slice <- chl_array[ , ,25] # I chose the 3rd of June because there are values for that day
 image(lon, lat, chl_slice) # yay looks pretty
 
 # Time to build a dataframe
@@ -89,7 +90,7 @@ dim(chl_final3)
 # make into csv
 write.csv(as.data.frame(chl_final3), "maggiore_June2020.csv", row.names = T)
 
-# Lake Scutari---
+# Lake Scutari----
 # Making a csv file of mean chlorophyll a from nc file of lake Scutari
 scu_nc <- nc_open("data/Scutari_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20190401_to_20190730-fv2.0.2.nc")
 print(scu_nc)

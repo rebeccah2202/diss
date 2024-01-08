@@ -10,6 +10,8 @@ analysing the water leaving reflectance. The lakes_cci project includes lake dat
 to huge datasets, which is why storing the data in NetCDF form is so useful.
 
 ### 2. Extracting `.nc` files for specific lakes using Google Collaboratory
+
+The following packages are necessary for extracting the data by lake id. The netCDF4 package can be installed using `!pip install netCDF4` however, after running into issues downloading the data, I found that by installing the package with no dependencies and no binary, led to better functioing, see [this github](https://github.com/Unidata/netcdf4-python/issues/1179) for more information. 
 ```
 !pip install --upgrade --force-reinstall --no-deps --no-cache-dir netcdf4==1.6.5 --no-binary netcdf4
 !pip install cftime
@@ -20,6 +22,17 @@ import datetime
 import netCDF4 as nc
 ```
 
+The first section of the code specifies the name of the lake masks necessary for downloading data that is specifc to each lake. This
+lake masks contains the boundaries of all lakes. So that this mask does not have to be loaded into the google colaboratory environment
+manually each time it is being used, a section of code was added that specifies where this lake mask is available. Then the parameters of the lake and time period has to be specified. The lake ids can be determined from a [metadata csv file](https://climate.esa.int/documents/1857/lakescci_v2.0.2_data-availability_gQHtOE6.csv). The lake ids for the lake in this research are:    
+<ol>
+  <li>Loch Lomond = 2516</li>
+  <li>Loch Leven = 12262</li>
+  <li>Loch Ness = 3114</li>
+  <li>Loch Neagh = 481</li>
+</ol>
+We also give the versino of the dataset we are using and make an output directory to where the files are loaded in google colab.   
+   
 ```
 ###########################################################################################
 # input parameters
@@ -166,6 +179,8 @@ seconds since 1970-01-01. Without this information, time values may be interpret
 
 **References**   
 https://towardsdatascience.com/how-to-crack-open-netcdf-files-in-r-and-extract-data-as-time-series-24107b70dcd
+https://github.com/cci-lakes/lakes_cci_tools/blob/main/lakes_cci_download1lake_by_id.ipynb
+
 
 
 

@@ -71,7 +71,7 @@ data_all <- list.files(path = "data/Leven",  # make list of csv files in the lev
 
 write.csv(as.data.frame(data_all), "data/Leven/Leven_chl.csv", row.names = FALSE)
 
-# Visualise data
+# Visualise data----
 leven <- read.csv("data/Leven/Leven_chl.csv")
 
 leven2 = leven %>% 
@@ -84,6 +84,7 @@ leven3 <- leven2 %>%
   mutate(doy = yday(ymd(Var3)),
          year = as.factor(year))
 
+# Plot raw data
 (plot <- ggplot(leven3, aes(x = doy, y = mean_chla, group = year, colour = year)) + 
     geom_point(size = 1) +                                               
     geom_line(linewidth=0.75) +
@@ -97,3 +98,16 @@ leven3 <- leven2 %>%
           panel.grid = element_blank(),                                          
           plot.margin = unit(c(1,1,1,1), units = , "cm")
     ))  
+
+# Boxplot to identify outliers
+(leaf_boxplot <- ggplot(leven3, aes(year, mean_chla)) + 
+    geom_boxplot(aes(colour=year)) +
+    geom_point(color="black", size=1, alpha=0.9) +
+    theme_classic() +
+    scale_fill_manual(values = colours) +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 12, face = "plain"),                     
+          panel.grid = element_blank(),                                 # Removing the background grid lines               
+          plot.margin = unit(c(1,1,1,1), units = , "cm"),               # Adding a margin
+          legend.position = "none",
+          plot.caption = element_text(hjust=0, size = 10)))  

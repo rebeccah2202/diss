@@ -6,11 +6,11 @@ library(terra)
 # install.packages("RNetCDF")
 library(RNetCDF)
 
-nc <- open.nc("lakes.nc")
+nc <- open.nc("maggiore.nc")
 print.nc(nc)
 
 library(stars)
-prec_file = system.file("lakes.nc", package = "stars")
+prec_file = system.file("maggiore.nc", package = "stars")
 (prec = read_stars(gdal_subdatasets(prec_file)[[10]]))
 
 # NetCDF file tutorial
@@ -23,58 +23,53 @@ library(ncdf4)
 
 
 # open a netCDF file
-nc_8 <- nc_open("lakes_8_01.nc")
-print(nc_8)
+nc_mag <- nc_open("maggiore.nc")
+print(nc_mag)
 # 66 variables
 # 4 dimensions
-dname <- "turbidity_mean"
-
-# cut down file by longitude/latitude
-# LonIdx <- which( nc_8$dim$lon$vals > -3.29 | nc_8$dim$lon$vals < -3.45)
-# LatIdx <- which( nc_8$dim$lat$vals > 56.13 & nc_8$dim$lat$vals < 56.26)
-# chla <- ncvar_get( nc_8, dname)[ LonIdx, LatIdx]
+dname <- "chla_mean"
 
 # get longitude and latitude
-lon <- ncvar_get(nc_8,"lon")
+lon <- ncvar_get(nc_mag,"lon")
 nlon <- dim(lon)
 head(lon)
 
-lat <- ncvar_get(nc_8,"lat")
+lat <- ncvar_get(nc_mag,"lat")
 nlat <- dim(lat)
 head(lat)
 
 print(c(nlon,nlat))
-# 43200 longitude values
-# 21600 latitude values
+# 47 longitude values
+# 57 latitude values
 
 # get time
-time <- ncvar_get(nc_8,"time")
+time <- ncvar_get(nc_mag,"time")
 time
-# 1596240000
+# 1533340800
 # seconds since 1970-01-01 00:00:00
 
-tunits <- ncatt_get(nc_8,"time","units")
+tunits <- ncatt_get(nc_mag,"time","units")
 nt <- dim(time)
 nt
 # only one time unit which I am assuming is because the dataset is for one day
 tunits
 
 # get chlorophyll-a
-chla_mean_array <- ncvar_get(nc_8, dname)
+chla_mean_array <- ncvar_get(nc_mag, dname)
 # too large?
-dlname <- ncatt_get(nc_8,dname,"long_name")
-dunits <- ncatt_get(nc_8,dname,"units")
-fillvalue <- ncatt_get(nc_8,dname,"_FillValue")
+dlname <- ncatt_get(nc_mag,dname,"long_name")
+dunits <- ncatt_get(nc_mag,dname,"units")
+fillvalue <- ncatt_get(nc_mag,dname,"_FillValue")
 dim(chla_mean_array)
-# 43200 21600
+# 47 57
 
 # get global attributes
-title <- ncatt_get(nc_8,0,"title")
-institution <- ncatt_get(nc_8,0,"institution")
-datasource <- ncatt_get(nc_8,0,"source")
-references <- ncatt_get(nc_8,0,"references")
-history <- ncatt_get(nc_8,0,"history")
-Conventions <- ncatt_get(nc_8,0,"Conventions")
+title <- ncatt_get(nc_mag,0,"title")
+institution <- ncatt_get(nc_mag,0,"institution")
+datasource <- ncatt_get(nc_mag,0,"source")
+references <- ncatt_get(nc_mag,0,"references")
+history <- ncatt_get(nc_mag,0,"history")
+Conventions <- ncatt_get(nc_mag,0,"Conventions")
 
 ls()
 
@@ -88,7 +83,7 @@ tmonth <- as.integer(unlist(tdstr)[2])
 tday <- as.integer(unlist(tdstr)[3])
 tyear <- as.integer(unlist(tdstr)[1])
 chron(time,origin=c(tmonth, tday, tyear))
-# 9/07/26
+# 7/10/14
 
 # replace netCDF fill values with NA's
 chla_mean_array[chla_mean_array==fillvalue$value] <- NA

@@ -12,8 +12,9 @@ library(dplyr)
 library(readr)
 
 # Load nc data ----
-# load in all .nc files for loch leven from leven folder
-files <- list.files(path = "data/Leven.", pattern = "*.nc", full.names=TRUE)
+# load in all .nc files for loch
+# substitute name depending on which loch it is
+files <- list.files(path = "data/Neagh.", pattern = "*.nc", full.names=TRUE)
 files
 
 # For loop to extract chlorophyll data from each .nc file ----
@@ -34,8 +35,8 @@ for(i in seq_along(files)) {
   # Build dataframe
   lonlattime <- as.matrix(expand.grid(lon,lat,time_obs))
   chl_vec_long <- as.vector(chl_array)
-  chl_obs <- data.frame(cbind(lonlattime, chl_vec_long))
-  chl_1 <- na.omit(chl_obs)
+  obs <- data.frame(cbind(lonlattime, chl_vec_long))
+  chl_1 <- na.omit(obs)
   chl_2 <- chl_1[-c(1:2)]
   chl_2$Var3 <- as.Date(chl_2$Var3)
   chl_2$chl_vec_long <- as.double(chl_2$chl_vec_long) 
@@ -43,49 +44,57 @@ for(i in seq_along(files)) {
   # summarise function to calculate mean chlorophyll-a value per day
   chl_3 <- chl_2 %>% 
     group_by(Var3) %>%
-    summarize(mean_chla = mean(chl_vec_long))
+    summarize(mean_chla = mean(chl_vec_long)) %>%
+    ungroup()
+  
+  # change column name Var3 to date 
+  colnames(chl_3)[1] <- "date" 
     
   # save new dataframe to folder as .csv file based on .nc file name
   nc_file_name <- basename(files[i])
-  csv_directory <- "data/Leven"
-  csv_file_name <- file.path(csv_directory, sub("\\.nc$", ".csv", nc_file_name, ignore.case = TRUE))
+  csv_directory <- "data/Neagh/chlorophyll"
+  prefix <- "chl"
+  csv_file_name <- file.path(csv_directory, sub("\\.nc$", paste0(prefix, "_", "\\1.csv"), nc_file_name, ignore.case = TRUE))
   write.csv(as.data.frame(chl_3), csv_file_name, row.names = FALSE)  # row.names must be false so that no additional column is added
 }
 
 # bind together all .csv files ---- 
-# load in all .csv files for loch leven from leven folder
+# load in all .csv files for each year 
 # main problem encountered when binding them together is that in some files the
 # mean_chla is "double" and in some it is a "character"
 # the function code allows for the as.character and as.double to be applied to each
 # dataframe in the list to ensure they can be binded together
+# okay so turns out for loch leven the problem stemmed from the year 2015
+# as there was no data in that csv file all columns were classified as logical
+# so by removing the 2015 file from the Leven folder I solved the problem :)
 
-data_all <- list.files(path = "data/Leven",  # make list of csv files in the leven folder
+# Again remember to substitute name of lake
+data_all <- list.files(path = "data/Neagh/chlorophyll",  # make list of csv files
                        pattern = "*.csv", full.names = TRUE) %>% 
   lapply(read_csv) %>%
   lapply(function(df) {
-    df$Var3 <- as.character(df$Var3)  # Var3 to character
+    df$date <- as.character(df$date)  # Var3 to character
     df$mean_chla <- as.double(df$mean_chla)  # mean_chla to double
     return(df)
   }) %>%
   bind_rows()
 
-write.csv(as.data.frame(data_all), "data/Leven/Leven_chl.csv", row.names = FALSE)
+write.csv(as.data.frame(data_all), "data/Chlorophyll/Neagh_chl.csv", row.names = FALSE)
 
 # Visualise data----
-leven <- read.csv("data/Leven/Leven_chl.csv")
+lake <- read.csv("data/Chlorophyll/Leven_chl.csv")
 
-leven2 = leven %>% 
-  mutate(Var3 = ymd(Var3)) %>% 
-  mutate_at(vars(Var3), funs(year, month, day))
-leven2 <- leven2[-c(1)]
+lake2 = lake %>% 
+  mutate(date = ymd(date)) %>% 
+  mutate_at(vars(date), funs(year, month, day))
 
 library(lubridate)
-leven3 <- leven2 %>%
-  mutate(doy = yday(ymd(Var3)),
+lake3 <- lake2 %>%
+  mutate(doy = yday(ymd(date)),
          year = as.factor(year))
 
 # Plot raw data
-(plot <- ggplot(leven3, aes(x = doy, y = mean_chla, group = year, colour = year)) + 
+(plot <- ggplot(lake3, aes(x = doy, y = mean_chla, group = year, colour = year)) + 
     geom_point(size = 1) +                                               
     geom_line(linewidth=0.75) +
     theme_classic() +
@@ -100,7 +109,7 @@ leven3 <- leven2 %>%
     ))  
 
 # Boxplot to identify outliers
-(leaf_boxplot <- ggplot(leven3, aes(year, mean_chla)) + 
+(leaf_boxplot <- ggplot(lake3, aes(year, mean_chla)) + 
     geom_boxplot(aes(colour=year)) +
     geom_point(color="black", size=1, alpha=0.9) +
     theme_classic() +
@@ -111,3 +120,4 @@ leven3 <- leven2 %>%
           plot.margin = unit(c(1,1,1,1), units = , "cm"),               # Adding a margin
           legend.position = "none",
           plot.caption = element_text(hjust=0, size = 10)))  
+

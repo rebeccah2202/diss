@@ -9,7 +9,7 @@ library(tidyverse)
 library(dplyr)
 
 # Making a csv file of mean chlorophyll a from nc file of lake maggiore in June 2020 ----
-mag_nc <- nc_open("data/Lomond/Lomond_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20200401_to_20200930-fv2.0.2.nc")
+mag_nc <- nc_open("data/Leven/Leven_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20050401_to_20050930-fv2.0.2.nc")
 print(mag_nc)
 
 attributes(mag_nc$var)

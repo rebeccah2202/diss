@@ -13,32 +13,36 @@ temp <- read.csv("data/Temperature/Lomond_temp.csv")
 
 temp = temp %>% mutate(year = year(date), day.year = yday(date))
 
+temp$year <- as.numeric(temp$year)
+
 ggplot(data = temp, aes(y = day.year, x = year))+
   geom_tile(aes(fill = temp_C))+
   theme_classic() +
   theme(plot.background = element_blank(),
         legend.position = "right",
         panel.border = element_blank(),
-        axis.text = element_text(colour = "black", size = 11),
-        axis.title = element_text(colour = 1, size = 12),
+        axis.text.x = element_text(colour = "black", size = 11, angle = 45, hjust = 1), # Rotating only x-axis text
+        axis.text.y = element_text(colour = "black", size = 11),
         legend.key.width = unit(4, "mm"),
         legend.key.height = unit(10, "mm"),
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 11),
         panel.grid = element_blank())+
   scale_fill_gradientn(colours = oceColorsJet(210))+ 
+  scale_x_continuous(breaks=seq(1995, 2020, 5))+
   guides(fill = guide_colorbar(title = expression (Temperature~(degree~C)), 
                                title.position = "top", title.hjust = 0.5,
                                title.vjust = 0.25, 
                                label.vjust = 1, raster = TRUE, frame.colour = NULL,
                                ticks.colour = 1, reverse = FALSE)) +
   coord_cartesian(ylim = c(90, 275)) +
-  labs(x = "", y = "Number of days in a Year")
+  labs(x = "", y = "Day of year")
+
 
 # Chlorophyll data----
 library(viridis)
 
-all.tb <- read.csv("data/Chlorophyll/Lomond_chl.csv")
+all.tb <- read.csv("data/Chlorophyll/Ness_chl.csv")
 
 all.tb <- all.tb %>%
   mutate(year = year(date), day.year = yday(date))
@@ -58,7 +62,7 @@ ggplot(data = all.tb, aes(y = day.year, x = year)) +
     legend.text = element_text(size = 11),
     panel.grid = element_blank()
   ) +
-  scale_fill_viridis_c(trans = "log") +  # Apply logarithmic transformation to the color scale
+  scale_fill_viridis_c() +  # To apply logarithmic transformation to the color scale add trans = "log"
   guides(
     fill = guide_colorbar(
       title = "Chlorophyll-a",
@@ -90,7 +94,7 @@ summary_stats <- temp.tb3 %>%
   group_by(day.year) %>%
   summarise(baseline = mean(temp_C))
 
-temp.tb <- merge(temp.tb, summary_stats,by="day.year")
+temp.tb <- merge(temp.tb, summary_stats, by="day.year")
 temp.tb <- mutate(temp.tb, anomaly = temp_C - baseline)
 temp.tb <- filter(temp.tb, year > 2002)
 

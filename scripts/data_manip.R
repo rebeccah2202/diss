@@ -5,7 +5,7 @@ library(tidyverse)
 library(hrbrthemes)
 library(viridis)
 
-# Task 1: combine all data into one dataframe----
+# Combine all data into one dataframe----
 # load data
 temp.leven <- read.csv("data/Temperature/Leven_temp.csv")
 chla.leven <- read.csv("data/Chlorophyll/Leven_chl.csv")
@@ -43,7 +43,7 @@ total <- total %>%
 
 write.csv(as.data.frame(total), "data/all.csv", row.names = T)
 
-# Task 2: Make boxplots of chlorophyll data for each lake----
+# Make boxplots of chlorophyll data for each lake----
 
 total %>%
   ggplot( aes(x=lake, y=mean_chla, fill=lake)) +
@@ -63,17 +63,17 @@ total %>%
 # It's important to know that these values are not independent, as they are replicated
 # through time
 
-# Task 3: Make a histogram of data----
-(hist <- ggplot(total, aes(x = mean_chla)) +
-    geom_histogram(colour = c("#458B74"), fill = "#66CDAA") +
-    theme_bw() +
-    ylab("Frequency\n") +
-    xlab("\nChla") +
-    theme(axis.text = element_text(size = 12),
-          axis.title = element_text(size = 14, face = "plain")))
+# Make a histogram of data----
+  (hist <- ggplot(total, aes(x = mean_chla)) +
+      geom_histogram(colour = c("#458B74"), fill = "#66CDAA") +
+      theme_bw() +
+      ylab("Frequency\n") +
+      xlab("\nChla") +
+      theme(axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14, face = "plain")))
 # left skewed data, but data does not have to be normally distributed right? poisson distribution?
 
-# Task 4: Calculate frequency of observations----
+# Calculate frequency of observations----
 # for each lake for each time period
 summary_stats <- total %>%
   subset(select = c(year, lake, mean_chla)) %>%
@@ -99,15 +99,16 @@ summary_stats2 <- summary_stats %>%
 # for the more recent time period. There are also notivable differences between 
 # the lakes
 
-# Task 5: Yearly chlorophyll a----
+# Yearly chlorophyll a----
 
-# for year 2003
-chla.leven.year <- read.csv("data/Leven/chlorophyll/Leven_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20030101_to_20041231-fv2.0.2chl_.csv")
-chla.leven.year <- chla.leven.year %>% mutate(year = year(date), day.year = yday(date)) %>% filter(year < 2004)
+# for year 2020
+chla.neagh.year <- read.csv("data/2020/Lomond_2020.csv")
+chla.neagh.year <- chla.neagh.year %>% mutate(year = year(date), day.year = yday(date))
 
-(plot <- ggplot(chla.leven.year, aes(x = day.year, y = mean_chla)) +
+(plot <- ggplot(chla.neagh.year, aes(x = day.year, y = mean_chla)) +
   geom_line(aes(group = 1), linewidth=0.75, colour=c("#7CCD7C")) +
   geom_point(size = 2, colour=c("#006400"))+
+  stat_smooth(se=FALSE, span=0.6, linewidth = 0.8, colour = "blue", linetype = "dashed") +
   theme_classic() +
   xlab("\ndoy")  +
   ylab("chlorphyll-a concentration 
@@ -120,7 +121,7 @@ chla.leven.year <- chla.leven.year %>% mutate(year = year(date), day.year = yday
   ))
   
 
-# Task 6: Baseline value and anomaly----
+# Baseline value and anomaly----
 total2 <- total %>% subset(select = c(day.year, year, lake, temp_C)) %>% filter(year < 2006)
 
 baseline_data <- total2 %>%
@@ -134,8 +135,8 @@ merged2 <- mutate(merged, anomaly = temp_C - baseline)
 # I maybe should reconsider interpolation
 
 
-# 22.02.2024----
-# Task 1: Visual inspection of temperature and chlorophyll a----
+
+# Visual inspection of temperature and chlorophyll a----
 neagh <- total %>% filter(lake=="leven", year==2020)
 
 # chlorophyll plot
@@ -165,3 +166,58 @@ neagh <- total %>% filter(lake=="leven", year==2020)
           panel.grid = element_blank(),                                          
           plot.margin = unit(c(1,1,1,1), units = , "cm")
     ))
+
+
+library(tidyverse)
+library(brms)
+library(Rcpp)
+library(tidybayes)
+
+all <- read.csv("data/all.csv")
+
+all <- mutate(all, log_chla = log(mean_chla))
+(hist <- ggplot(all, aes(x = log_chla)) +
+    geom_histogram(colour = c("#458B74"), fill = "#66CDAA") +
+    theme_bw() +
+    ylab("Frequency\n") +
+    xlab("\nChla") +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14, face = "plain")))
+
+model <- brms::brm(log_chla ~ I(year - 2002) * lake,   # Interaction between country and year, location of pop. random effect
+                                       data = all, family = gaussian(), chains = 3,                       # Poisson distribution
+                                       iter = 4000, warmup = 1000,
+                                       control = list(max_treedepth = 15, adapt_delta = 0.9))
+summary(model)
+
+(location_seperate <- all %>%
+    group_by(lake) %>%
+    add_predicted_draws(model) %>%                                                                  # Adding the posterior distribution
+    ggplot(aes(x = year, y = log_chla, color = ordered(lake), fill = ordered(lake))) +   # Adding colours for different countries
+    stat_lineribbon(aes(y = .prediction), .width = c(.95, .80, .50), alpha = 1/4) +                 # Adding regression line and CI
+    geom_point(data = all) +                                                                      # Adding raw data
+    facet_wrap(~ lake, scales = "free_y") +                                                 # Separating countries into separate graphs
+    ylab("chla\n") +
+    xlab("\nYear") +
+    scale_fill_brewer(palette = "Set2") +                                                           # Changing colour palette
+    scale_color_brewer(palette = "Dark2") +
+    theme_classic() +                                                                                # adding turtle theme
+    theme(panel.spacing = unit(1.5, "lines")))
+
+# Look at climatological seasonal cycle and determine temperatures in 90th percentile----
+temp<- read.csv("data/Temperature/Neagh_temp.csv")
+
+# 90th percentile
+percentile <- quantile(temp$temp_C, probs = 0.9)
+percentile
+
+(p <- ggplot(temp, aes(x=temp_C)) +
+    geom_histogram(aes(fill = temp_C > 18), colour = "black", binwidth=0.5) + 
+    geom_density(aes(y=0.5*..count..), colour="black", adjust=4) +
+    scale_fill_manual(values = c(`TRUE` = "darkred", `FALSE` = "grey")) +
+    scale_alpha_manual(values = c(`TRUE` = 0.9, `FALSE` = 0.6)) +
+    ylab("Frequency of Temperature\n") + 
+    theme_classic())
+
+
+  

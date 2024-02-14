@@ -1,4 +1,4 @@
-ness <- read.csv("data/Ness/Ness_chl.csv")
+ness <- read.csv("data/Chlorophyll/Lomond_chl.csv")
 
 ness2 = ness %>% 
   mutate(date = ymd(date)) %>% 

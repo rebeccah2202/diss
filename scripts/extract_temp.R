@@ -12,7 +12,7 @@ library(tidyverse)
 library(dplyr)
 
 # Load in nc
-leven_nc <- nc_open("data/Ness/Ness_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20160401_to_20160930-fv2.0.2.nc")
+leven_nc <- nc_open("data/Ness/Ness_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20100401_to_20100930-fv2.0.2.nc")
 print(leven_nc)
 
 lat <- ncvar_get(leven_nc, "lat")
@@ -75,7 +75,8 @@ print(class(temp$temp_vec_long))
 temp$temp_vec_long <- as.numeric(temp$temp_vec_long)
 
 # Then remove all rows with values below 0.01
-temp_2 <- filter(temp, temp_vec_long > 0.01)
+# this additional threshold is necessary as the land pixels are given a very low fill value
+temp_2 <- filter(temp, temp_vec_long > 0.01) 
 dim(temp_2)
 
 # no more need for lat and lon because we are taking the mean so spatial data nor more relevance

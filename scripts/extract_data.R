@@ -8,7 +8,7 @@ library(tidyverse)
 library(dplyr)
 
 # Making a csv file of mean chlorophyll and temperature from nc file of loch lomond----
-nc <- nc_open("data/Leven/Leven_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20050401_to_20050930-fv2.0.2.nc")
+nc <- nc_open("data/2020/Lomond_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20200101_to_20201231-fv2.0.2.nc")
 
 lat <- ncvar_get(nc, "lat")
 nlat <- dim(lat)
@@ -30,15 +30,6 @@ dim(chl_array)
 chl_array[chl_array==fillvalue$value] <- NA
 chl_array
 
-# Extract temperature data
-temp_array <- ncvar_get(nc, "lake_surface_water_temperature")
-fillvalue2 <- ncatt_get(nc, "lake_surface_water_temperature", "_FillValue")
-dim(temp_array)
-
-# replace fill value with NAs
-temp_array[temp_array==fillvalue2$value] <- NA
-temp_array
-
 print(tunits) # unit is seconds since 1970-01-01
 
 class(time)
@@ -48,7 +39,7 @@ dim(time_obs) # why is the NULL?
 range(time_obs)
 # the range is correct - it is showing from 2020-06-01 GMT to 2020-06-30 GMT
 
-chl_slice <- chl_array[ , ,25] # I chose the 3rd of June because there are values for that day
+chl_slice <- chl_array[ , ,124] # I chose the 3rd of June because there are values for that day
 image(lon, lat, chl_slice) # yay looks pretty
 
 # Time to build a dataframe
@@ -56,11 +47,10 @@ lonlattime <- as.matrix(expand.grid(lon,lat,time_obs))
 
 # reshape
 chl_vec_long <- as.vector(chl_array)
-temp_vec_long <- as.vector(temp_array)
 length(lonlattime)
 
 # Create a data frame
-obs <- data.frame(cbind(lonlattime, chl_vec_long, temp_vec_long))
+obs <- data.frame(cbind(lonlattime, chl_vec_long))
 head(obs)
 
 # Remove all rows with NA values
@@ -84,11 +74,10 @@ glimpse(obs_final2) # the chlorophyll data is stored as characters
 # change the type of data
 obs_final2$Var3 <- as.Date(obs_final2$Var3)
 obs_final2$chl_vec_long <- as.double(obs_final2$chl_vec_long) 
-obs_final2$temp_vec_long <- as.double(obs_final2$temp_vec_long) 
 
 obs_final3 <- obs_final2 %>% 
   group_by(Var3) %>%
-  summarize(mean_temp = mean(temp_vec_long), mean_chla = mean(chl_vec_long)) %>%
+  summarize(mean_chla = mean(chl_vec_long)) %>%
   ungroup()
 
 dim(obs_final3)
@@ -97,8 +86,5 @@ dim(obs_final3)
 # change column name Var3 to date 
 colnames(obs_final3)[1] <- "date" 
 
-# Convert Kelvin to Celcius
-obs_final4 <- obs_final3 %>% mutate(temp_C = mean_temp-273.15)
-
 # make into csv
-write.csv(as.data.frame(obs_final4), "Lomond_2020.csv", row.names = T)
+write.csv(as.data.frame(obs_final3), "data/2020/Lomond_2020.csv", row.names = T)

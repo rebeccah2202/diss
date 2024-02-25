@@ -8,29 +8,29 @@ library(ncdf4)
 library(tidyverse)
 library(dplyr)
 
-# Making a csv file of mean chlorophyll a from nc file of lake maggiore in June 2020 ----
-mag_nc <- nc_open("data/Leven/Leven_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20050401_to_20050930-fv2.0.2.nc")
-print(mag_nc)
+# Making a csv file of mean chlorophyll a from nc file ----
+nc <- nc_open("data/Leven/Leven_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20110401_to_20110930-fv2.0.2.nc")
+print(nc)
 
-attributes(mag_nc$var)
-attributes(mag_nc$dim)
+attributes(nc$var)
+attributes(nc$dim)
 
-lat <- ncvar_get(mag_nc, "lat")
+lat <- ncvar_get(nc, "lat")
 nlat <- dim(lat)
 
-lon <- ncvar_get(mag_nc, "lon")
+lon <- ncvar_get(nc, "lon")
 nlon <- dim(lon)
 
 print(c(nlon, nlat))
 
-time <- ncvar_get(mag_nc, "time")
+time <- ncvar_get(nc, "time")
 head(time)
-tunits <- ncatt_get(mag_nc, "time", "units")
+tunits <- ncatt_get(nc, "time", "units")
 nt <- dim(time)  # the length is 30 which makes sense because it is data over one month
 
 # Extract chlorophyll a data
-chl_array <- ncvar_get(mag_nc, "chla_mean")
-fillvalue <- ncatt_get(mag_nc, "chla_mean", "_FillValue")
+chl_array <- ncvar_get(nc, "chla_mean")
+fillvalue <- ncatt_get(nc, "chla_mean", "_FillValue")
 dim(chl_array) # again it gives me the length of lat and long (47, 57) and the time 30
 
 # replace fill value with NAs
@@ -88,79 +88,5 @@ dim(chl_final3)
 # 21 days with a mean chlorophyll a value for each day
 
 # make into csv
-write.csv(as.data.frame(chl_final3), "maggiore_June2020.csv", row.names = T)
+# write.csv(as.data.frame(chl_final3), "leven_year.csv", row.names = T)
 
-# Lake Scutari----
-# Making a csv file of mean chlorophyll a from nc file of lake Scutari
-scu_nc <- nc_open("data/Scutari_ESACCI-LAKES-L3S-LK_PRODUCTS-MERGED-20190401_to_20190730-fv2.0.2.nc")
-print(scu_nc)
-
-attributes(scu_nc$var)
-attributes(scu_nc$dim)
-
-lat <- ncvar_get(scu_nc, "lat")
-nlat <- dim(lat)
-
-lon <- ncvar_get(scu_nc, "lon")
-nlon <- dim(lon)
-
-print(c(nlon, nlat))
-
-time <- ncvar_get(scu_nc, "time")
-head(time)
-tunits <- ncatt_get(scu_nc, "time", "units")
-nt <- dim(time)  
-
-# Extract chlorophyll a data
-chl_array <- ncvar_get(scu_nc, "chla_mean")
-fillvalue <- ncatt_get(scu_nc, "chla_mean", "_FillValue")
-dim(chl_array) 
-
-# replace fill value with NAs
-chl_array[chl_array==fillvalue$value] <- NA
-chl_array
-
-print(tunits) # unit is seconds since 1970-01-01
-
-class(time)
-# Corrected date origin with hyphens
-time_obs <- as.POSIXct(as.numeric(as.character(time)), origin = "1970-01-01", tz="GMT")
-dim(time_obs)
-range(time_obs)
-
-
-chl_slice <- chl_array[ , , 15] 
-image(lon, lat, chl_slice)
-
-# Time to build a dataframe
-lonlattime <- as.matrix(expand.grid(lon,lat,time_obs))
-
-# reshape
-chl_vec_long <- as.vector(chl_array)
-length(lonlattime)
-
-# Create a data frame
-chl_obs <- data.frame(cbind(lonlattime, chl_vec_long))
-head(chl_obs)
-
-# Remove all rows with NA values
-chl_final <- na.omit(chl_obs)
-dim(chl_obs)
-dim(chl_final)
-
-# no more need for lat and lon because we are taking the mean so spatial data nor more relevance
-chl_final2 <- chl_final[-c(1:2)]
-chl_final2
-
-# check data type
-glimpse(chl_final2) # the chlorophyll data is stored as characters
-
-# change the type of data
-chl_final2$Var3 <- as.Date(chl_final2$Var3)
-chl_final2$chl_vec_long <- as.double(chl_final2$chl_vec_long) 
-
-chl_final3 <- chl_final2 %>% 
-  group_by(Var3) %>%
-  summarize(mean_chla = mean(chl_vec_long))
-chl_final3
-dim(chl_final3)

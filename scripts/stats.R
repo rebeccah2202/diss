@@ -143,7 +143,8 @@ df3$date <- as.Date(df3$date)
   ))
 
 ggplot(df4, aes(x=z_score_temp, y=z_score_chla, color=depth_type)) +
-  geom_point(size=1) +
+  geom_point(size=2) +
+  scale_color_brewer(palette = "Dark2") +
   theme_classic()
 
 ggplot(df3, aes(x=date, y=z_score_temp, color=depth_type)) +
@@ -427,5 +428,7 @@ indiv_lake %>%
   ggtitle(paste(lake_name)) +
   labs(x="\nyear", y="chlorophyll-a\n")
 
-
+# colour palettes----
+library(RColorBrewer)
+display.brewer.all(colorblindFriendly = TRUE)
       

@@ -4,6 +4,7 @@
 library(tidyverse)
 library(hrbrthemes)
 library(viridis)
+library(lubridate)
 
 # Combine all data into one dataframe----
 # load data
@@ -67,6 +68,7 @@ total %>%
 
 # Calculate frequency of observations----
 # for each lake for each time period
+total <- read.csv("data/all.csv")
 summary_stats <- total %>%
   subset(select = c(year, lake, mean_chla)) %>%
   na.omit() %>%

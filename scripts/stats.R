@@ -59,13 +59,17 @@ ggplot(yearly_summary, aes(x = year)) +
 df <- read.csv("data/all.csv")
 df3 <- df %>%
   drop_na(temp_C) %>%
-  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 10)) %>%
+  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 11)) %>%
   mutate(depth_type = case_when(
     lake %in% c("lomond", "ness") ~ "deep",
     lake %in% c("leven", "neagh") ~ "shallow",
   ))
 
 hist(df3$z_score_temp)
+install.packages("colourpicker")
+(p <- ggplot(df3, aes(x=z_score_temp)) + 
+  geom_histogram(binwidth=0.5, fill="#CD2626", color="#e9ecef", alpha=0.9) +
+  theme_lakes())
 
 mod2 <- lmer(data = df3, z_score_temp ~ year * depth_type + (1|day.year))
 summary(mod2)
@@ -432,3 +436,68 @@ indiv_lake %>%
 library(RColorBrewer)
 display.brewer.all(colorblindFriendly = TRUE)
       
+
+# determine suitable z-score----
+# Temperature
+
+# Yearly z-score ----
+# calculate z score
+df <- read.csv("data/all.csv")
+# Group the data by year and calculate yearly mean and standard deviation
+df2 <- filter(df, lake == "lomond", year>2002)
+
+yearly_summary <- df2 %>%
+  group_by(year) %>%
+  summarise(
+    yearly_mean_temp = mean(temp_C, na.rm = TRUE),
+    yearly_mean_chla = mean(mean_chla, na.rm =TRUE),
+    yearly_sd_chla= sd(mean_chla, na.rm = TRUE),
+    yearly_sd_temp = sd(temp_C, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# Compute z-score for each year
+yearly_summary <- yearly_summary %>%
+  mutate(
+    yearly_z_score_chla = (yearly_mean_chla - mean(yearly_mean_chla)) / sd(yearly_mean_chla),
+    yearly_z_score_temp = (yearly_mean_temp - mean(yearly_mean_temp)) / sd(yearly_mean_temp)
+  )
+
+# Visualise
+ggplot(yearly_summary, aes(x = year)) + 
+  geom_point(aes(y = yearly_z_score_chla, color = "CHLA"), size = 2) +
+  geom_line(aes(y = yearly_z_score_chla, color = "CHLA"), linewidth=1) +
+  geom_point(aes(y = yearly_z_score_temp, color = "Temperature"), size = 2) +
+  geom_line(aes(y = yearly_z_score_temp, color = "Temperature"), linewidth=1, linetype="dashed") +
+  scale_color_manual(values = c("CHLA" = "darkblue", "Temperature" = "darkred")) +
+  labs(color = "Variables") +
+  theme_classic() +
+  theme(legend.position = "top")
+
+
+# Rolling z-score----
+
+df <- read.csv("data/all.csv")
+df3 <- df %>%
+  drop_na(temp_C) %>%
+  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 9))
+
+grob <- grobTree(textGrob("width=9", x=0.1,  y=0.95, hjust=0,
+                          gp=gpar(col="black", fontsize=13)))
+
+(p <- ggplot(df3, aes(x=z_score_temp)) + 
+    geom_histogram(binwidth=0.5, fill="#CD2626", color="#e9ecef", alpha=0.9) +
+    labs(x ="\ntemperature z score", y="count\n") +
+    annotation_custom(grob) +
+    theme_lakes())
+
+df10 <- df %>%
+  drop_na(mean_chla) %>%
+  group_by(year, lake) %>% mutate(z_score_chla = roll_scale(mean_chla, width = 9))
+
+
+(p <- ggplot(df10, aes(x=z_score_chla)) + 
+    geom_histogram(binwidth=0.5, fill="#9BCD9B", color="#e9ecef", alpha=0.9) +
+    labs(x ="\ntemperature z score", y="count\n") +
+    annotation_custom(grob) +
+    theme_lakes())

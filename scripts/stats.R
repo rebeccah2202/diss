@@ -501,3 +501,10 @@ df10 <- df %>%
     labs(x ="\ntemperature z score", y="count\n") +
     annotation_custom(grob) +
     theme_lakes())
+
+df1_new <- df1 %>% mutate(fit.c = predict(mod1, re.form=NULL))
+df1_new %>% 
+  ggplot(aes(x=year, y=z_score_temp, col=lake)) +
+  geom_point(pch = 16) +
+  geom_line(aes(y= fit.c), col="black", size=2) +
+  facet_wrap(vars(lake))

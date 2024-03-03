@@ -2,7 +2,7 @@
 # by Rebecca Hies
 # 21.02.2024
 
-# Library
+# Library----
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -28,14 +28,20 @@ df <- read.csv("data/all.csv")
 # width of window should not be below 10 to ensure a normal distribution
 df1 <- df %>%
   drop_na(temp_C) %>%
-  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 9))
+  group_by(year, lake) %>% 
+  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%
+  ungroup() %>%
+  drop_na(z_score_temp)
+
 
 # time to run models
 # As temperature is very variable depending on the season, it is important to have the
 # day of year as a random variable
+# Lake as a random variable
+# Making random effcects have random slopes causes singularity issues - why?
 mod_null <- lmer(data=df1, z_score_temp ~ 1 + (1|day.year))
 
-mod1 <- lmer(data = df1, z_score_temp ~ year + (1|day.year) + (1|lake))
+mod1 <- lmer(data = df1, z_score_temp ~ year + (1|lake) + (1|day.year))
 summary(mod1)
 
 hist(resid(mod1))
@@ -127,6 +133,32 @@ r.squaredGLMM(mod6)
 # increases it's explanatory power - this is opposite to the AIC
 
 # Accept null hypothesis that chlorophyll-a is not explained by temp during this time
+
+# Lake model
+mod_lake_null <- lmer(data = df2, z_score_chla ~ 1 + (1|day.year))
+mod_lake <- lmer(data = df2, z_score_chla ~ z_score_temp : lake + (1|day.year))
+summary(mod_lake)
+
+hist(resid(mod_lake))
+plot(mod_lake, which = 2)
+qqnorm(resid(mod_lake))
+qqline(resid(mod_lake))
+
+AIC(mod_lake_null, mod_lake)  # AiC is higher than null model
+
+# Loch Leven Model
+data_leven <- filter(df2, lake=="leven")
+mod_leven <- lmer(data = data_leven, z_score_chla ~ z_score_temp + (1|day.year))
+summary(mod_leven)
+
+hist(resid(mod_leven)) # a bit dodgy
+plot(mod_leven, which = 2)
+qqnorm(resid(mod_leven))
+qqline(resid(mod_leven))
+
+mod_leven_null <- lmer(data = data_leven, z_score_chla ~ 1 + (1|day.year))
+
+AICc(mod_leven_null, mod_leven) # hmmm
 
 # Research Question 3----
 # Are extreme lake surface temperatures explaining extreme lake chlorophyll-a 
@@ -237,8 +269,8 @@ indiv_lake %>%
   ggtitle(paste(lake_name)) +
   labs(x="\nyear", y="chlorophyll-a\n")
 
-# Research Question 1:
-# Extract effects of interaction
+# Visualise Research Question 1----
+# Extract effect of year on the temperature z-score
 eff1 <- effect("year", mod1)
 
 # Convert effect object to dataframe for plotting
@@ -252,22 +284,37 @@ eff_df1 <- as.data.frame(eff1)
     labs(y = "Predicted temperature z-score", x = "year") +
     theme_lakes())
 
+ggsave(filename = 'img/mod1_predictions.png', mod1_predictions, 
+       device = 'png', width = 10, height = 8)
+
 df1$date <- as.Date(df1$date)
 
-(temp_plot <- ggplot(df1, aes(x = date, y = z_score_temp)) +
-  geom_point(aes(colour="lightblue"), size = 1) +
+(temp_plot <- ggplot(df1, aes(x = year, y = z_score_temp)) +
+  geom_point(size = 1) +
   theme_lakes())
 
-(combined_plot <- original_plot +
-    geom_line(data = eff_df, aes(x = quantile_T, y = fit, color = depth_type), linewidth=.75) +
-    labs(x = "\n90th percentile temperature (°C)", color = "Depth Type") + 
-    ylab(bquote("90th percentile chlorophyll-a mg m"^-3)) +
+(tempyearplot <- temp_plot +
+    geom_line(data = eff_df1, aes(x = year, y = fit), linewidth=.75) +
+    labs(x = "\nyear") + 
+    ylab("z-score Temperature\n") +
     scale_linetype_manual(name="", values = "solid" ))
 
+ggsave(filename = 'img/temp_year.png', tempyearplot, 
+       device = 'png', width = 8, height = 6)
 
+# Visualise random effecty
+coef(mod1)$lake
+# how can the intercept be so high??
 
+# plot only gives linear relationship when i remove day.year from model
+(random_plot <- ggplot(df1, aes(x = year, y = z_score_temp, colour = lake)) +
+    geom_point(alpha = 0.5) +
+    facet_wrap(~lake) +
+    geom_line(data = cbind(df1, pred = predict(mod1)), aes(y = pred), linewidth = 1) + 
+    theme_lakes()
+)
 
-# Research Question 2:
+# Visualise Research Question 2 ----
 (tempchlaplot <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=depth_type)) +
   geom_point(aes(shape = depth_type), size=2) +
   scale_color_brewer(palette = "Dark2") +
@@ -281,7 +328,58 @@ df1$date <- as.Date(df1$date)
 ggsave(filename = 'img/temp_chla.png', tempchlaplot, 
        device = 'png', width = 8, height = 6)
 
-# Research Question 3:
+# colour by lake
+(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
+    geom_point(aes(shape = lake), size=2) +
+    facet_wrap(~lake) +
+    scale_color_brewer(palette = "Set2") +
+    ylab("z-score
+       chlorophyll-a\n") +
+    xlab("\nz-score
+       lake surface water temperature") +
+    labs(color="lake", shape ="lake") +
+    theme_lakes())
+# looks like there may be a relationship in loch leven
+# leven model shows significant positive relationship in loch leven
+
+# Extract effect of the temperature z-score on chla from lake model
+eff_lake <- effect("z_score_temp:lake", mod_lake)
+eff_df_lake <- as.data.frame(eff_lake)
+
+(lake_plot_effect <- tempchlaplot2 +
+    geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
+    labs(x = "z-score Temperature\n") + 
+    ylab("z-score Chlorophyll-a\n") +
+    scale_linetype_manual(name="", values = "solid" ))
+
+
+# Extract effect of the temperature z-score on chla from leven model
+eff_leven <- effect("z_score_temp", mod_leven)
+eff_df_leven <- as.data.frame(eff_leven)
+
+(leven_plot <- ggplot(data_leven, aes(x = z_score_temp, y = z_score_chla)) +
+    geom_point(size = 1) +
+    theme_lakes())
+
+(leven_plot_effect <- leven_plot +
+    geom_line(data = eff_df_leven, aes(x = z_score_temp, y = fit), linewidth=.75) +
+    labs(x = "z-score Temperature\n") + 
+    ylab("z-score Chlorophyll-a\n") +
+    scale_linetype_manual(name="", values = "solid" ))
+
+# Visualise Research Question 3 ----
+# Visualise difference in extreme chla between depth groups
+# make boxplot
+(depth_box <- ggplot(data=quantiles, aes(x=depth_type, y=quantile_C, fill=depth_type, group = depth_type)) +
+  geom_boxplot(aes(fill=depth_type)) +
+  geom_point(color="black", size=0.4, alpha=0.9) +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_lakes() +
+  labs(x="\ndepth type", y="90th percentile chlorophyll-a\n",  color = "Depth Type"))
+
+ggsave(filename = 'img/boxplot_extremes.png', depth_box, 
+       device = 'png', width = 10, height = 8)
+
 # Extract effects of interaction
 eff <- effect("quantile_T:depth_type", mod9)
 
@@ -316,4 +414,16 @@ original_plot <- ggplot(quantiles, aes(x = quantile_T, y = quantile_C, color = d
 
 ggsave(filename = 'img/extremes.png', combined_plot, 
        device = 'png', width = 10, height = 8)
+
+# Visualise random effects of mod 9
+coef(mod9)$lake
+# intercepts make semi sense
+
+# does not look too bad
+(random_plot_extreme <- ggplot(quantiles, aes(x = quantile_T, y = quantile_C, colour = depth_type)) +
+    geom_point(alpha = 0.5) +
+    facet_wrap(~lake) +
+    geom_line(data = cbind(quantiles, pred = predict(mod9)), aes(y = pred), linewidth = 1) + 
+    theme_lakes()
+)
 

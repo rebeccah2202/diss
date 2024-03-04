@@ -8,7 +8,7 @@ library(dplyr)
 library(ggplot2)
 library(roll) # for moving z-score
 library(lme4)
-library(lmerTest)
+library(lmerTest) # when you load this then you get a p-value
 library(effects) # to extract model predictions
 library(MuMIn) # for marginal and conditional R2
 library(car) # for Variance Inflation Factor
@@ -33,15 +33,14 @@ df1 <- df %>%
   ungroup() %>%
   drop_na(z_score_temp)
 
-
 # time to run models
 # As temperature is very variable depending on the season, it is important to have the
 # day of year as a random variable
 # Lake as a random variable
 # Making random effcects have random slopes causes singularity issues - why?
-mod_null <- lmer(data=df1, z_score_temp ~ 1 + (1|day.year))
+mod_null <- lmer(data=df1, z_score_temp ~ 1 + (1|lake))
 
-mod1 <- lmer(data = df1, z_score_temp ~ year + (1|lake) + (1|day.year))
+mod1 <- lmer(data = df1, z_score_temp ~ year + (1|lake))
 summary(mod1)
 
 hist(resid(mod1))
@@ -49,7 +48,7 @@ plot(mod1, which = 2)
 qqnorm(resid(mod1))
 qqline(resid(mod1))
 
-mod2 <- lmer(data = df1, z_score_temp ~ year + depth_type + (1|day.year) + (1|lake))
+mod2 <- lmer(data = df1, z_score_temp ~ year : depth_type + (1|lake))
 summary(mod2)
 
 hist(resid(mod2))
@@ -89,9 +88,9 @@ df2 <- df %>%
 # Models
 # I am including lake as a random effect as chlorophyll concentrations differ noticeably between them
 # I am not interested in quantifying this but it needs to be included
-mod_null2 <- lmer(data = df2, z_score_chla ~ 1 + (1|day.year) + (1|lake))
+mod_null2 <- lmer(data = df2, z_score_chla ~ 1 + (1|lake))
 
-mod4 <- lmer(data = df2, z_score_chla ~ z_score_temp + (1|day.year) + (1|lake))
+mod4 <- lmer(data = df2, z_score_chla ~ z_score_temp + (1|lake))
 summary(mod4)
 
 hist(resid(mod4))
@@ -99,7 +98,7 @@ plot(mod4, which = 2)
 qqnorm(resid(mod4))
 qqline(resid(mod4))
 
-mod5 <- lmer(data = df2, z_score_chla ~ z_score_temp + depth_type + (1|day.year) + (1|lake))
+mod5 <- lmer(data = df2, z_score_chla ~ z_score_temp + depth_type + (1|lake))
 summary(mod5)
 
 hist(resid(mod5))
@@ -107,7 +106,7 @@ plot(mod5, which = 2)
 qqnorm(resid(mod5))
 qqline(resid(mod5))
 
-mod6 <- lmer(data = df2, z_score_chla ~ z_score_temp * depth_type + (1|day.year) + (1|lake))
+mod6 <- lmer(data = df2, z_score_chla ~ z_score_temp * depth_type + (1|lake))
 summary(mod6)
 
 hist(resid(mod6))
@@ -115,15 +114,23 @@ plot(mod6, which = 2)
 qqnorm(resid(mod6))
 qqline(resid(mod6))
 
+mod_lake <- lmer(data = df2, z_score_chla ~ z_score_temp : lake)
+summary(mod_lake)
+
+hist(resid(mod_lake))
+plot(mod_lake, which = 2)
+qqnorm(resid(mod_lake))
+qqline(resid(mod_lake))
+
 
 # AIC
-AIC(mod_null2, mod4, mod5, mod6)
+AIC(mod_null2, mod4, mod5, mod6, mod_lake)
 # none of the models explains more than the null model
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
 vif(mod5) # not correlated
-vif(mod6) # do I need this?
+vif(mod_lake)
 
 # Marginal and Conditional R2
 r.squaredGLMM(mod4)
@@ -133,32 +140,6 @@ r.squaredGLMM(mod6)
 # increases it's explanatory power - this is opposite to the AIC
 
 # Accept null hypothesis that chlorophyll-a is not explained by temp during this time
-
-# Lake model
-mod_lake_null <- lmer(data = df2, z_score_chla ~ 1 + (1|day.year))
-mod_lake <- lmer(data = df2, z_score_chla ~ z_score_temp : lake + (1|day.year))
-summary(mod_lake)
-
-hist(resid(mod_lake))
-plot(mod_lake, which = 2)
-qqnorm(resid(mod_lake))
-qqline(resid(mod_lake))
-
-AIC(mod_lake_null, mod_lake)  # AiC is higher than null model
-
-# Loch Leven Model
-data_leven <- filter(df2, lake=="leven")
-mod_leven <- lmer(data = data_leven, z_score_chla ~ z_score_temp + (1|day.year))
-summary(mod_leven)
-
-hist(resid(mod_leven)) # a bit dodgy
-plot(mod_leven, which = 2)
-qqnorm(resid(mod_leven))
-qqline(resid(mod_leven))
-
-mod_leven_null <- lmer(data = data_leven, z_score_chla ~ 1 + (1|day.year))
-
-AICc(mod_leven_null, mod_leven) # hmmm
 
 # Research Question 3----
 # Are extreme lake surface temperatures explaining extreme lake chlorophyll-a 
@@ -271,15 +252,15 @@ indiv_lake %>%
 
 # Visualise Research Question 1----
 # Extract effect of year on the temperature z-score
-eff1 <- effect("year", mod1)
+eff1 <- effect("year:depth_type", mod2)
 
 # Convert effect object to dataframe for plotting
 eff_df1 <- as.data.frame(eff1)
 
 # Visualization of predictions
-(mod1_predictions <- ggplot(eff_df1, aes(x = year, y = fit)) +
-    geom_point(size = 3) +
-    geom_line() +
+(mod1_predictions <- ggplot(eff_df1, aes(x = year, y = fit, color = depth_type, group = depth_type)) +
+    geom_point(aes(shape = depth_type), size = 3) +
+    geom_line(aes(linetype = depth_type)) +
     scale_color_brewer(palette = "Dark2") +
     labs(y = "Predicted temperature z-score", x = "year") +
     theme_lakes())
@@ -287,26 +268,25 @@ eff_df1 <- as.data.frame(eff1)
 ggsave(filename = 'img/mod1_predictions.png', mod1_predictions, 
        device = 'png', width = 10, height = 8)
 
-df1$date <- as.Date(df1$date)
-
-(temp_plot <- ggplot(df1, aes(x = year, y = z_score_temp)) +
-  geom_point(size = 1) +
+(temp_plot <- ggplot(df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type)) +
+  geom_jitter(size = 1) +
+  labs(color="Depth Type", shape ="Depth Type") +
+  scale_color_brewer(palette = "Dark2") +
   theme_lakes())
 
 (tempyearplot <- temp_plot +
-    geom_line(data = eff_df1, aes(x = year, y = fit), linewidth=.75) +
-    labs(x = "\nyear") + 
+    geom_line(data = eff_df1, aes(x = year, y = fit, color = depth_type), linewidth=.75) +
+    labs(x = "\nyear", color="Depth Type") + 
     ylab("z-score Temperature\n") +
     scale_linetype_manual(name="", values = "solid" ))
 
 ggsave(filename = 'img/temp_year.png', tempyearplot, 
        device = 'png', width = 8, height = 6)
 
-# Visualise random effecty
+# Visualise random effect
 coef(mod1)$lake
 # how can the intercept be so high??
 
-# plot only gives linear relationship when i remove day.year from model
 (random_plot <- ggplot(df1, aes(x = year, y = z_score_temp, colour = lake)) +
     geom_point(alpha = 0.5) +
     facet_wrap(~lake) +
@@ -348,21 +328,6 @@ eff_df_lake <- as.data.frame(eff_lake)
 
 (lake_plot_effect <- tempchlaplot2 +
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
-    labs(x = "z-score Temperature\n") + 
-    ylab("z-score Chlorophyll-a\n") +
-    scale_linetype_manual(name="", values = "solid" ))
-
-
-# Extract effect of the temperature z-score on chla from leven model
-eff_leven <- effect("z_score_temp", mod_leven)
-eff_df_leven <- as.data.frame(eff_leven)
-
-(leven_plot <- ggplot(data_leven, aes(x = z_score_temp, y = z_score_chla)) +
-    geom_point(size = 1) +
-    theme_lakes())
-
-(leven_plot_effect <- leven_plot +
-    geom_line(data = eff_df_leven, aes(x = z_score_temp, y = fit), linewidth=.75) +
     labs(x = "z-score Temperature\n") + 
     ylab("z-score Chlorophyll-a\n") +
     scale_linetype_manual(name="", values = "solid" ))
@@ -426,4 +391,3 @@ coef(mod9)$lake
     geom_line(data = cbind(quantiles, pred = predict(mod9)), aes(y = pred), linewidth = 1) + 
     theme_lakes()
 )
-

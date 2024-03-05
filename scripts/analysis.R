@@ -83,7 +83,8 @@ df2 <- df %>%
   drop_na(temp_C, mean_chla) %>%
   filter(year > 2001) %>%    # there is only chlorophyll-a data after 2001
   group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%
-  mutate(z_score_chla=roll_scale(mean_chla, width=10))
+  mutate(z_score_chla=roll_scale(mean_chla, width=10)) %>%
+  ungroup()
 
 # Models
 # I am including lake as a random effect as chlorophyll concentrations differ noticeably between them
@@ -258,14 +259,14 @@ eff1 <- effect("year:depth_type", mod2)
 eff_df1 <- as.data.frame(eff1)
 
 # Visualization of predictions
-(mod1_predictions <- ggplot(eff_df1, aes(x = year, y = fit, color = depth_type, group = depth_type)) +
+(mod2_predictions <- ggplot(eff_df1, aes(x = year, y = fit, color = depth_type, group = depth_type)) +
     geom_point(aes(shape = depth_type), size = 3) +
     geom_line(aes(linetype = depth_type)) +
     scale_color_brewer(palette = "Dark2") +
     labs(y = "Predicted temperature z-score", x = "year") +
     theme_lakes())
 
-ggsave(filename = 'img/mod1_predictions.png', mod1_predictions, 
+ggsave(filename = 'img/mod2_predictions.png', mod2_predictions, 
        device = 'png', width = 10, height = 8)
 
 (temp_plot <- ggplot(df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type)) +
@@ -309,16 +310,9 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
        device = 'png', width = 8, height = 6)
 
 # colour by lake
-(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
-    geom_point(aes(shape = lake), size=2) +
-    facet_wrap(~lake) +
-    scale_color_brewer(palette = "Set2") +
-    ylab("z-score
-       chlorophyll-a\n") +
-    xlab("\nz-score
-       lake surface water temperature") +
-    labs(color="lake", shape ="lake") +
-    theme_lakes())
+
+
+
 # looks like there may be a relationship in loch leven
 # leven model shows significant positive relationship in loch leven
 
@@ -331,6 +325,19 @@ eff_df_lake <- as.data.frame(eff_lake)
     labs(x = "z-score Temperature\n") + 
     ylab("z-score Chlorophyll-a\n") +
     scale_linetype_manual(name="", values = "solid" ))
+
+# facet with all points in background
+df_dif <- select(df2, -lake)
+(tempchlaplot2 <- ggplot(df2, aes(z_score_temp, z_score_chla)) + 
+    geom_point(data = df_dif, colour = "grey70") +  
+    geom_point(aes(colour = lake, shape = lake)) + 
+    facet_wrap(~ lake) +
+    ylab("z-score
+       chlorophyll-a\n") +
+    xlab("\nz-score
+       lake surface water temperature") +
+    labs(color="lake") +
+    theme_lakes())
 
 # Visualise Research Question 3 ----
 # Visualise difference in extreme chla between depth groups

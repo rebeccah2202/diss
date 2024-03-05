@@ -15,6 +15,30 @@ library(car) # for Variance Inflation Factor
 library(RColorBrewer)
 library(lubridate) # determine day of year
 
+# Summary statistics----
+df <- read.csv("data/all.csv")
+
+# Temperature
+summary_stats_temp <- df %>%
+  group_by(lake) %>%
+  drop_na(temp_C) %>%
+  summarise(n = n(),  # Calculating sample size n
+            average_temp = mean(temp_C),
+            median_temp = median(temp_C), 
+            minimum_temp = min(temp_C),
+            maximum_temp = max(temp_C))
+
+# Chlorophyll-a
+summary_stats_chla <- df %>%
+  group_by(lake) %>%
+  drop_na(mean_chla) %>%
+  summarise(n = n(),
+            average_chla = mean(mean_chla),
+            median_chla = median(mean_chla), 
+            minimum_chla = min(mean_chla),
+            maximum_chla = max(mean_chla))
+
+
 # Research Question 1----
 # Has the lake surface water temperature increased in two different depth regimes since 1995? 
 
@@ -34,10 +58,7 @@ df1 <- df %>%
   drop_na(z_score_temp)
 
 # time to run models
-# As temperature is very variable depending on the season, it is important to have the
-# day of year as a random variable
 # Lake as a random variable
-# Making random effcects have random slopes causes singularity issues - why?
 mod_null <- lmer(data=df1, z_score_temp ~ 1 + (1|lake))
 
 mod1 <- lmer(data = df1, z_score_temp ~ year + (1|lake))
@@ -48,7 +69,8 @@ plot(mod1, which = 2)
 qqnorm(resid(mod1))
 qqline(resid(mod1))
 
-mod2 <- lmer(data = df1, z_score_temp ~ year : depth_type + (1|lake))
+mod_null_lm <- lm(data = df1, z_score_temp ~ 1)
+mod2 <- lm(data = df1, z_score_temp ~ year * depth_type)
 summary(mod2)
 
 hist(resid(mod2))
@@ -59,10 +81,8 @@ qqline(resid(mod2))
 
 # AIC
 AIC(mod_null, mod1, mod2)
-# mod1 and mod2 have lower AIC values than the null model
-# mod2 indicates that there is a small decrease in temperature over time??
-# mod2 also shows that the temperature z score is significantly lower in shallow
-# lakes than deep lakes. I don't really believe this but okay i guess
+# mod1 and mod2 have higher AIC values than the null model
+AIC(mod_null_lm, mod2) # still higher
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
@@ -115,7 +135,8 @@ plot(mod6, which = 2)
 qqnorm(resid(mod6))
 qqline(resid(mod6))
 
-mod_lake <- lmer(data = df2, z_score_chla ~ z_score_temp : lake)
+mod_lake_null <- lm(data = df2, z_score_chla ~ 1)
+mod_lake <- lm(data = df2, z_score_chla ~ z_score_temp : lake)
 summary(mod_lake)
 
 hist(resid(mod_lake))
@@ -125,8 +146,8 @@ qqline(resid(mod_lake))
 
 
 # AIC
-AIC(mod_null2, mod4, mod5, mod6, mod_lake)
-# none of the models explains more than the null model
+AIC(mod_null2, mod4, mod5, mod6, mod_lake) # none of the models explains more than the null model
+AIC(mod_lake_null, mod_lake) # now lower hmmmm
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
@@ -269,6 +290,7 @@ eff_df1 <- as.data.frame(eff1)
 ggsave(filename = 'img/mod2_predictions.png', mod2_predictions, 
        device = 'png', width = 10, height = 8)
 
+# df1$year <- as.Date(df1$date)
 (temp_plot <- ggplot(df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type)) +
   geom_jitter(size = 1) +
   labs(color="Depth Type", shape ="Depth Type") +
@@ -310,8 +332,15 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
        device = 'png', width = 8, height = 6)
 
 # colour by lake
-
-
+(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
+  geom_point(aes(shape = lake), size=1.25) +
+  facet_wrap(~lake) +
+  ylab("z-score
+       chlorophyll-a\n") +
+  xlab("\nz-score
+       lake surface water temperature") +
+  labs(color="lake", shape ="lake") +
+  theme_lakes())
 
 # looks like there may be a relationship in loch leven
 # leven model shows significant positive relationship in loch leven

@@ -331,14 +331,15 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
        device = 'png', width = 8, height = 6)
 
 # colour by lake
-(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
+(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, fill=lake)) +
   geom_point(aes(shape = lake), size=1.25) +
   facet_wrap(~lake) +
+  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
   ylab("z-score
        chlorophyll-a\n") +
   xlab("\nz-score
        lake surface water temperature") +
-  labs(color="lake", shape ="lake") +
+  labs(fill="lake", shape ="lake") +
   theme_lakes())
 
 # looks like there may be a relationship in loch leven
@@ -352,6 +353,7 @@ eff_df_lake <- as.data.frame(eff_lake)
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
     labs(x = "z-score Temperature\n") + 
     ylab("z-score Chlorophyll-a\n") +
+    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
     scale_linetype_manual(name="", values = "solid" ))
 
 # facet with all points in background

@@ -14,6 +14,7 @@ library(MuMIn) # for marginal and conditional R2
 library(car) # for Variance Inflation Factor
 library(RColorBrewer)
 library(lubridate) # determine day of year
+library(viridis)
 
 # Summary statistics----
 df <- read.csv("data/all.csv")
@@ -22,22 +23,21 @@ df <- read.csv("data/all.csv")
 summary_stats_temp <- df %>%
   group_by(lake) %>%
   drop_na(temp_C) %>%
-  summarise(n = n(),  # Calculating sample size n
-            average_temp = mean(temp_C),
-            median_temp = median(temp_C), 
-            minimum_temp = min(temp_C),
-            maximum_temp = max(temp_C))
+  summarise(n = n(), # sample size
+            average_temp = round(mean(temp_C), 1),
+            median_temp = round(median(temp_C), 1), 
+            minimum_temp = round(min(temp_C), 1),
+            maximum_temp = round(max(temp_C), 1))
 
 # Chlorophyll-a
 summary_stats_chla <- df %>%
   group_by(lake) %>%
   drop_na(mean_chla) %>%
   summarise(n = n(),
-            average_chla = mean(mean_chla),
-            median_chla = median(mean_chla), 
-            minimum_chla = min(mean_chla),
-            maximum_chla = max(mean_chla))
-
+            average_chla = round(mean(mean_chla), 1),
+            median_chla = round(median(mean_chla), 1), 
+            minimum_chla = round(min(mean_chla), 1),
+            maximum_chla = round(max(mean_chla), 1))
 
 # Research Question 1----
 # Has the lake surface water temperature increased in two different depth regimes since 1995? 
@@ -152,7 +152,6 @@ AIC(mod_lake_null, mod_lake) # now lower hmmmm
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
 vif(mod5) # not correlated
-vif(mod_lake)
 
 # Marginal and Conditional R2
 r.squaredGLMM(mod4)
@@ -376,7 +375,8 @@ df_dif <- select(df2, -lake)
   geom_point(color="black", size=0.4, alpha=0.9) +
   scale_fill_brewer(palette = "Dark2") +
   theme_lakes() +
-  labs(x="\ndepth type", y="90th percentile chlorophyll-a\n",  color = "Depth Type"))
+  theme(legend.position="none") +
+  labs(x="\ndepth type", y="90th percentile chlorophyll-a (mg/m\u00B3)\n",  color = "Depth Type"))
 
 ggsave(filename = 'img/boxplot_extremes.png', depth_box, 
        device = 'png', width = 10, height = 8)
@@ -392,7 +392,7 @@ eff_df <- as.data.frame(eff)
   geom_point(aes(shape = depth_type), size = 3) +
   geom_line(aes(linetype = depth_type)) +
   scale_color_brewer(palette = "Dark2") +
-  labs(y = "Predicted chlorophyll-a", x = "90th percentile temperature (°C)", color = "Depth Type", linetype = "Depth Type", shape ="Depth Type") +
+  labs(y = "Predicted chlorophyll-a (mg/m\u00B3)", x = "90th percentile temperature (°C)", color = "Depth Type", linetype = "Depth Type", shape ="Depth Type") +
   theme_lakes())
 
 ggsave(filename = 'img/mod9_predictions.png', mod9_predictions, 
@@ -404,13 +404,14 @@ original_plot <- ggplot(quantiles, aes(x = quantile_T, y = quantile_C, color = d
   scale_color_brewer(palette = "Dark2") +
   labs(color="Depth Type", shape ="Depth Type") +
   geom_point(size = 2) +
-  theme_lakes()
+  theme_lakes() +
+  theme(legend.position = "none")
 
 # Add model predictions to original data
 (combined_plot <- original_plot +
   geom_line(data = eff_df, aes(x = quantile_T, y = fit, color = depth_type), linewidth=.75) +
   labs(x = "\n90th percentile temperature (°C)", color = "Depth Type") + 
-  ylab(bquote("90th percentile chlorophyll-a mg m"^-3)) +
+  ylab("90th percentile chlorophyll-a (mg/m\u00B3)") +
   scale_linetype_manual(name="", values = "solid" ))
 
 ggsave(filename = 'img/extremes.png', combined_plot, 
@@ -427,3 +428,21 @@ coef(mod9)$lake
     geom_line(data = cbind(quantiles, pred = predict(mod9)), aes(y = pred), linewidth = 1) + 
     theme_lakes()
 )
+
+# Visualise summary stats----
+
+# Chlorophyll-a boxplot
+
+(chla_boxplot <- ggplot(df,aes(x=lake, y=mean_chla, fill=lake)) +
+  geom_boxplot() +
+  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+  theme_lakes() +
+  theme(
+    legend.position="none",
+    plot.title = element_text(size=11)
+  ) +
+  ylab("chlorphyll-a concentration (mg/m\u00B3)\n") +
+  xlab(""))
+
+ggsave(filename = 'img/boxplot_chla.png', chla_boxplot, 
+       device = 'png', width = 10, height = 8)

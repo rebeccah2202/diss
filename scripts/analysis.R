@@ -289,10 +289,18 @@ eff_df1 <- as.data.frame(eff1)
 ggsave(filename = 'img/mod2_predictions.png', mod2_predictions, 
        device = 'png', width = 10, height = 8)
 
-# df1$year <- as.Date(df1$date)
-(temp_plot <- ggplot(df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type)) +
-  geom_jitter(size = 1) +
-  labs(color="Depth Type", shape ="Depth Type") +
+df1$year <- as.Date(df1$year)
+mean_values <- df1 %>%
+  group_by(year) %>%
+  summarize(mean_temp = mean(z_score_temp))
+
+(temp_plot <- ggplot() +
+  geom_jitter(data = df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), size = 1) +
+  geom_point(data = mean_values, aes(x = year, y = mean_temp), color = "black", size = 2) +
+  geom_line(data = mean_values, aes(x = year, y = mean_temp), color = "black") + 
+  labs(color = "Depth Type", shape = "Depth Type") +
+  ylab("z-score Temperature\n") +
+  xlab("\nyear") +
   scale_color_brewer(palette = "Dark2") +
   theme_lakes())
 
@@ -301,6 +309,9 @@ ggsave(filename = 'img/mod2_predictions.png', mod2_predictions,
     labs(x = "\nyear", color="Depth Type") + 
     ylab("z-score Temperature\n") +
     scale_linetype_manual(name="", values = "solid" ))
+
+ggsave(filename = 'img/temp_plot.png', temp_plot, 
+       device = 'png', width = 8, height = 6)
 
 ggsave(filename = 'img/temp_year.png', tempyearplot, 
        device = 'png', width = 8, height = 6)
@@ -331,15 +342,15 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
        device = 'png', width = 8, height = 6)
 
 # colour by lake
-(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, fill=lake)) +
+(tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
   geom_point(aes(shape = lake), size=1.25) +
   facet_wrap(~lake) +
-  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+  scale_color_viridis(discrete = TRUE, alpha=0.6) +
   ylab("z-score
        chlorophyll-a\n") +
   xlab("\nz-score
        lake surface water temperature") +
-  labs(fill="lake", shape ="lake") +
+  labs(color="lake", shape ="lake") +
   theme_lakes())
 
 # looks like there may be a relationship in loch leven
@@ -353,14 +364,18 @@ eff_df_lake <- as.data.frame(eff_lake)
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
     labs(x = "z-score Temperature\n") + 
     ylab("z-score Chlorophyll-a\n") +
-    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+    scale_color_viridis(discrete = TRUE, alpha=0.6) +
     scale_linetype_manual(name="", values = "solid" ))
+
+ggsave(filename = 'img/lake_scatter.png', lake_plot_effect, 
+       device = 'png', width = 8, height = 6)
 
 # facet with all points in background
 df_dif <- select(df2, -lake)
 (tempchlaplot2 <- ggplot(df2, aes(z_score_temp, z_score_chla)) + 
     geom_point(data = df_dif, colour = "grey70") +  
-    geom_point(aes(colour = lake, shape = lake)) + 
+    geom_point(aes(colour = lake, shape = lake)) +
+    scale_color_viridis(discrete = TRUE, alpha=0.6) +
     facet_wrap(~ lake) +
     ylab("z-score
        chlorophyll-a\n") +
@@ -407,7 +422,7 @@ original_plot <- ggplot(quantiles, aes(x = quantile_T, y = quantile_C, color = d
   labs(color="Depth Type", shape ="Depth Type") +
   geom_point(size = 2) +
   theme_lakes() +
-  theme(legend.position = "none")
+  theme()
 
 # Add model predictions to original data
 (combined_plot <- original_plot +

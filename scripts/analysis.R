@@ -8,13 +8,15 @@ library(dplyr)
 library(ggplot2)
 library(roll) # for moving z-score
 library(lme4)
-library(lmerTest) # when you load this then you get a p-value
+# library(lmerTest) # when you load this then you get a p-value
 library(effects) # to extract model predictions
 library(MuMIn) # for marginal and conditional R2
 library(car) # for Variance Inflation Factor
 library(RColorBrewer)
 library(lubridate) # determine day of year
 library(viridis)
+library(tools) # to capitalise
+library(patchwork) # make panel of plots
 
 # Summary statistics----
 df <- read.csv("data/all.csv")
@@ -213,13 +215,11 @@ qqline(resid(mod8))
 mod9 <- lmer(data = quantiles, quantile_C ~ quantile_T : depth_type + (1|lake))
 summary(mod9)
 hist(resid(mod9))
-plot(mod9, which = 2) # homoscedasticity??
+plot(mod9, which = 2) 
 qqnorm(resid(mod9))
 qqline(resid(mod9))
 
 AIC(mod_null3, mod7, mod8, mod9)
-
-
 # all models explain more variation than the null model
 # mod8 is the best
 # but mod9 is also very good and highlights the influence of depth type
@@ -228,10 +228,15 @@ AIC(mod_null3, mod7, mod8, mod9)
 vif(mod8) # not correlated
 
 # Marginal and Conditional R2
-r.squaredGLMM(mod7)
+r.squaredGLMM(mod7) # i don't get how the conditional r2 can be higher than in the other two models
 r.squaredGLMM(mod8)
 r.squaredGLMM(mod9)
 # adding depth type increases the marginal R2 but not the conditional R2
+
+# are extreme events becoming more frequent
+quantiles2 <- filter(quantiles, depth_type == "shallow")
+mod10 <- lmer(data = quantiles2, quantile_T ~ year + (1|year))
+summary(mod10)
 
 # Visualisation----
 
@@ -242,76 +247,51 @@ display.brewer.all(colorblindFriendly = TRUE)
 # Create theme
 theme_lakes <- function(){
   theme_classic() +
-    theme(axis.text.x = element_text(size = 12),
-          axis.text.y = element_text(size = 12),
+    theme(axis.text.x = element_text(size = 13),
+          axis.text.y = element_text(size = 13),
           axis.title = element_text(size = 13, face = "plain"),
           plot.margin = unit(c(1,1,1,1), units = , "cm"), 
           panel.grid = element_blank(), 
           panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-          legend.text = element_text(size = 12))
+          legend.text = element_text(size = 13),
+          legend.title = element_text(size=13))
 }
-
-# Visualise raw data
-indiv_lake <- df %>% filter( lake == "neagh", year > 2002, mean_chla >= 0.001) %>%
-  drop_na(mean_chla)
-
-lake_name <- unique(indiv_lake$lake)
-
-indiv_lake %>%
-  ggplot(aes(x=year, y=mean_chla)) +
-  geom_boxplot() +
-  geom_jitter(color="black", size=0.4, alpha=0.9) +
-  scale_y_continuous(trans = "log",  breaks = c(0, 0.01, 0.1, 1, 10, 100)) + 
-  theme_classic() +
-  theme(
-    legend.position="none",
-    plot.title = element_text(size=11),
-    axis.text.x=element_text(angle=60, hjust=1)
-  ) +
-  ggtitle(paste(lake_name)) +
-  labs(x="\nyear", y="chlorophyll-a\n")
 
 # Visualise Research Question 1----
 # Extract effect of year on the temperature z-score
-eff1 <- effect("year:depth_type", mod2)
+eff1 <- effect("year", mod1)
 
 # Convert effect object to dataframe for plotting
 eff_df1 <- as.data.frame(eff1)
 
 # Visualization of predictions
-(mod2_predictions <- ggplot(eff_df1, aes(x = year, y = fit, color = depth_type, group = depth_type)) +
-    geom_point(aes(shape = depth_type), size = 3) +
-    geom_line(aes(linetype = depth_type)) +
+(mod2_predictions <- ggplot(eff_df1, aes(x = year, y = fit)) +
+    geom_point(size = 3) +
+    geom_line() +
     scale_color_brewer(palette = "Dark2") +
     labs(y = "Predicted temperature z-score", x = "year") +
     theme_lakes())
 
-ggsave(filename = 'img/mod2_predictions.png', mod2_predictions, 
+ggsave(filename = 'img/mod1_predictions.png', mod1_predictions, 
        device = 'png', width = 10, height = 8)
 
-df1$year <- as.Date(df1$year)
-mean_values <- df1 %>%
-  group_by(year) %>%
-  summarize(mean_temp = mean(z_score_temp))
-
+selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (temp_plot <- ggplot() +
-  geom_jitter(data = df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), size = 1) +
-  geom_point(data = mean_values, aes(x = year, y = mean_temp), color = "black", size = 2) +
-  geom_line(data = mean_values, aes(x = year, y = mean_temp), color = "black") + 
+  geom_jitter(data = df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
   labs(color = "Depth Type", shape = "Depth Type") +
-  ylab("z-score Temperature\n") +
+  ylab("LSWT z-score\n") +
   xlab("\nyear") +
   scale_color_brewer(palette = "Dark2") +
-  theme_lakes())
+  theme_lakes() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_continuous(breaks = selected_years))
 
 (tempyearplot <- temp_plot +
-    geom_line(data = eff_df1, aes(x = year, y = fit, color = depth_type), linewidth=.75) +
-    labs(x = "\nyear", color="Depth Type") + 
-    ylab("z-score Temperature\n") +
+    geom_line(data = eff_df1, aes(x = year, y = fit, linetype = "Prediction"), linewidth=.75) +
+    labs(x = "\nyear", color="Depth Type",  linetype = "Legend") + 
+    ylab("LSWT z-score\n") +
+    scale_x_continuous(breaks = selected_years) +
     scale_linetype_manual(name="", values = "solid" ))
-
-ggsave(filename = 'img/temp_plot.png', temp_plot, 
-       device = 'png', width = 8, height = 6)
 
 ggsave(filename = 'img/temp_year.png', tempyearplot, 
        device = 'png', width = 8, height = 6)
@@ -331,10 +311,8 @@ coef(mod1)$lake
 (tempchlaplot <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=depth_type)) +
   geom_point(aes(shape = depth_type), size=2) +
   scale_color_brewer(palette = "Dark2") +
-  ylab("z-score
-       chlorophyll-a\n") +
-  xlab("\nz-score
-       lake surface water temperature") +
+  ylab("chlorophyll-a  z-score\n") +
+  xlab("\nLSWT z-score") +
   labs(color="Depth Type", shape ="Depth Type") +
   theme_lakes())
 
@@ -342,16 +320,21 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
        device = 'png', width = 8, height = 6)
 
 # colour by lake
+df2$lake <- toTitleCase(df2$lake) # captitalise lake names
 (tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
   geom_point(aes(shape = lake), size=1.25) +
   facet_wrap(~lake) +
-  scale_color_viridis(discrete = TRUE, alpha=0.6) +
-  ylab("z-score
-       chlorophyll-a\n") +
-  xlab("\nz-score
-       lake surface water temperature") +
+  scale_color_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
+  ylab("chlorophyll-a z-score\n") +
+  xlab("\nLSWT z-score") +
   labs(color="lake", shape ="lake") +
-  theme_lakes())
+  theme_lakes() +
+  theme(strip.background = element_rect(colour="black", fill="white", 
+                                        size=.25, linetype="solid"),
+        panel.spacing = unit(2, "lines"),
+        legend.position = "none")
+  )
+
 
 # looks like there may be a relationship in loch leven
 # leven model shows significant positive relationship in loch leven
@@ -360,11 +343,14 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
 eff_lake <- effect("z_score_temp:lake", mod_lake)
 eff_df_lake <- as.data.frame(eff_lake)
 
+eff_df_lake$lake <- as.character(eff_df_lake$lake)
+eff_df_lake$lake <- toTitleCase(eff_df_lake$lake) # captitalise lake names
+
 (lake_plot_effect <- tempchlaplot2 +
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
-    labs(x = "z-score Temperature\n") + 
-    ylab("z-score Chlorophyll-a\n") +
-    scale_color_viridis(discrete = TRUE, alpha=0.6) +
+    ylab("chlorophyll-a z-score\n") +
+    xlab("\nLSWT z-score") +
+    scale_color_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
     scale_linetype_manual(name="", values = "solid" ))
 
 ggsave(filename = 'img/lake_scatter.png', lake_plot_effect, 
@@ -375,12 +361,10 @@ df_dif <- select(df2, -lake)
 (tempchlaplot2 <- ggplot(df2, aes(z_score_temp, z_score_chla)) + 
     geom_point(data = df_dif, colour = "grey70") +  
     geom_point(aes(colour = lake, shape = lake)) +
-    scale_color_viridis(discrete = TRUE, alpha=0.6) +
+    scale_color_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
     facet_wrap(~ lake) +
-    ylab("z-score
-       chlorophyll-a\n") +
-    xlab("\nz-score
-       lake surface water temperature") +
+    ylab("chlorophyll-a z-score\n") +
+    xlab("\nLSWT z-score") +
     labs(color="lake") +
     theme_lakes())
 
@@ -393,10 +377,12 @@ df_dif <- select(df2, -lake)
   scale_fill_brewer(palette = "Dark2") +
   theme_lakes() +
   theme(legend.position="none") +
-  labs(x="\ndepth type", y="90th percentile chlorophyll-a (mg/m\u00B3)\n",  color = "Depth Type"))
+  labs(x="\ndepth type",  color = "Depth Type") +
+  ylab(expression(paste("90th percentile chlorophyll-a (mg m"^" -3", ")")))
+) 
 
 ggsave(filename = 'img/boxplot_extremes.png', depth_box, 
-       device = 'png', width = 10, height = 8)
+       device = 'png', width = 8, height = 6)
 
 # Extract effects of interaction
 eff <- effect("quantile_T:depth_type", mod9)
@@ -427,12 +413,13 @@ original_plot <- ggplot(quantiles, aes(x = quantile_T, y = quantile_C, color = d
 # Add model predictions to original data
 (combined_plot <- original_plot +
   geom_line(data = eff_df, aes(x = quantile_T, y = fit, color = depth_type), linewidth=.75) +
-  labs(x = "\n90th percentile temperature (°C)", color = "Depth Type") + 
-  ylab("90th percentile chlorophyll-a (mg/m\u00B3)") +
-  scale_linetype_manual(name="", values = "solid" ))
+  labs(x = "\n90th percentile LSWT (°C)", color = "Depth Type") + 
+  ylab(expression(paste("90th percentile chlorophyll-a (mg m"^" -3", ")"))) +
+  scale_linetype_manual(name="", values = "solid" )
+  )
 
 ggsave(filename = 'img/extremes.png', combined_plot, 
-       device = 'png', width = 10, height = 8)
+       device = 'png', width = 8, height = 6)
 
 # Visualise random effects of mod 9
 coef(mod9)$lake
@@ -446,20 +433,47 @@ coef(mod9)$lake
     theme_lakes()
 )
 
+(extremetempovertime <- ggplot(quantiles2, aes(x = year, y = quantile_T)) +
+  scale_color_brewer(palette = "Dark2") +
+  stat_smooth(span=0.25, se = FALSE) +
+  geom_point(size = 2) +
+  theme_lakes())
+
 # Visualise summary stats----
 
 # Chlorophyll-a boxplot
+# Load the tools package
+df$lake <- toTitleCase(df$lake) 
 
 (chla_boxplot <- ggplot(df,aes(x=lake, y=mean_chla, fill=lake)) +
   geom_boxplot() +
-  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+  scale_fill_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
   theme_lakes() +
-  theme(
-    legend.position="none",
-    plot.title = element_text(size=11)
-  ) +
-  ylab("chlorphyll-a concentration (mg/m\u00B3)\n") +
+  theme(legend.position="none") +
+  ylab(expression(paste("chlorophyll-a concentration (mg m"^" -3", ")"))) +
   xlab(""))
 
 ggsave(filename = 'img/boxplot_chla.png', chla_boxplot, 
-       device = 'png', width = 10, height = 8)
+       device = 'png', width = 8, height = 6)
+
+# Temperature boxplot
+(temp_boxplot <- ggplot(df,aes(x=lake, y=temp_C, fill=lake)) +
+    geom_boxplot() +
+    scale_fill_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
+    theme_lakes() +
+    theme(
+      legend.position="none"
+    ) +
+    ylab("LSWT (°C)\n") +
+    xlab(""))
+
+ggsave(filename = 'img/boxplot_temp.png', temp_boxplot, 
+       device = 'png', width = 8, height = 6)
+
+
+# Combine the plots into a panel
+(panel_plot <- chla_boxplot + temp_boxplot + plot_layout(ncol = 2))
+
+# Save the panel plot
+ggsave(filename = 'img/panel_boxplots.png', panel_plot, 
+       device = 'png', width = 12, height = 6)

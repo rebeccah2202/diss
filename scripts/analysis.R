@@ -50,20 +50,30 @@ summary_stats_chla <- df %>%
 # Load all data
 df <- read.csv("data/all.csv")
 
-# calculate rolling z-score using roll package
-# width of window should not be below 10 to ensure a normal distribution
-df1 <- df %>%
+# Extract the year and month from the date column
+df <- df %>%
+  mutate(year = year(date),
+         month = month(date, label = TRUE)) %>%
+  filter(!month=="Mar")
+
+selected_df <- df[, c("temp_C", "date", "month", "lake", "year", "depth_type")]
+
+# Filter to keep only the years with data for each month from April to September
+filtered_df <- selected_df %>%
   drop_na(temp_C) %>%
-  group_by(year, lake) %>% 
-  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%
-  ungroup() %>%
-  drop_na(z_score_temp)
+  group_by(year) %>%
+  summarise(has_all_months = n_distinct(month) == 6) %>%
+  filter(has_all_months)
+
+# Filter the original data frame based on the selected years
+df_filtered <- df %>%
+  filter(year %in% filtered_df$year)
 
 # time to run models
 # Lake as a random variable
-mod_null <- lmer(data=df1, z_score_temp ~ 1 + (1|lake))
+mod_null <- lmer(data=df_filtered, temp_C ~ 1 + (1|lake/year))
 
-mod1 <- lmer(data = df1, z_score_temp ~ year + (1|lake))
+mod1 <- lmer(data = df_filtered, temp_C ~ year + (1|lake/year))
 summary(mod1)
 
 hist(resid(mod1))
@@ -71,8 +81,7 @@ plot(mod1, which = 2)
 qqnorm(resid(mod1))
 qqline(resid(mod1))
 
-mod_null_lm <- lm(data = df1, z_score_temp ~ 1)
-mod2 <- lm(data = df1, z_score_temp ~ year * depth_type)
+mod2 <- lmer(data = df_filtered, temp_C ~ year * depth_type + (1|lake/year))
 summary(mod2)
 
 hist(resid(mod2))
@@ -84,7 +93,49 @@ qqline(resid(mod2))
 # AIC
 AIC(mod_null, mod1, mod2)
 # mod1 and mod2 have higher AIC values than the null model
-AIC(mod_null_lm, mod2) # still higher
+
+# Variance Inflation Factor
+# check for multicollinearity problem in models with multiple fixed effects
+vif(mod2) # wtf correlated
+
+# Marginal and Conditional R2
+r.squaredGLMM(mod1)
+r.squaredGLMM(mod2)
+# The marginal and conditional R2 indicate that including depth type in the model
+# increases it's explanatory power but only by a very small amount
+
+# Has the lake surface water temperature become more anomolous in two different depth regimes since 1995? 
+df_anom <- df_filtered %>%
+  group_by(year, lake) %>% 
+  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%
+  ungroup() %>%
+  drop_na(z_score_temp)
+
+# Lake as a random variable
+mod_null <- lmer(data=df_anom, z_score_temp ~ 1 + (1|lake))
+
+mod1 <- lmer(data = df_anom, z_score_temp ~ year + (1|lake))
+summary(mod1)
+
+hist(resid(mod1))
+plot(mod1, which = 2)
+qqnorm(resid(mod1))
+qqline(resid(mod1))
+
+mod_null_lm <- lm(data = df_anom, z_score_temp ~ 1)
+mod2 <- lm(data = df_anom, z_score_temp ~ year * depth_type)
+summary(mod2)
+
+hist(resid(mod2))
+plot(mod2, which = 2)
+qqnorm(resid(mod2))
+qqline(resid(mod2))
+# all assumptions are being met
+
+# AIC
+AIC(mod_null, mod1)
+# mod1 and mod2 have higher AIC values than the null model
+AIC(mod_null_lm, mod2) #still higher
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
@@ -265,11 +316,11 @@ eff1 <- effect("year", mod1)
 eff_df1 <- as.data.frame(eff1)
 
 # Visualization of predictions
-(mod2_predictions <- ggplot(eff_df1, aes(x = year, y = fit)) +
+(mod1_predictions <- ggplot(eff_df1, aes(x = year, y = fit)) +
     geom_point(size = 3) +
     geom_line() +
     scale_color_brewer(palette = "Dark2") +
-    labs(y = "Predicted temperature z-score", x = "year") +
+    labs(y = "Predicted temperature", x = "year") +
     theme_lakes())
 
 ggsave(filename = 'img/mod1_predictions.png', mod1_predictions, 
@@ -277,7 +328,7 @@ ggsave(filename = 'img/mod1_predictions.png', mod1_predictions,
 
 selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (temp_plot <- ggplot() +
-  geom_jitter(data = df1, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
+  geom_jitter(data = df_filtered, aes(x = year, y = temp_C, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
   labs(color = "Depth Type", shape = "Depth Type") +
   ylab("LSWT z-score\n") +
   xlab("\nyear") +
@@ -477,3 +528,39 @@ ggsave(filename = 'img/boxplot_temp.png', temp_boxplot,
 # Save the panel plot
 ggsave(filename = 'img/panel_boxplots.png', panel_plot, 
        device = 'png', width = 12, height = 6)
+
+
+
+# Potential additions----
+(plot <- ggplot(quantiles, aes(x = year, y = quantile_T, color = depth_type, shape = depth_type)) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(color="Depth Type", shape ="Depth Type") +
+  geom_point(size = 2) +
+  theme_lakes() +
+  theme())
+
+mod <- lmer(data = quantiles, quantile_T ~ year+ (1|lake))
+summary(mod)
+
+
+# Fixed effects coefficients from mod9
+intercept <- 15.4894
+coeff_quantile_T_deep <- 0.2292
+coeff_quantile_T_shallow <- 3.2910
+
+# Define extrapolated quantile_T values
+extrap_quantile_T <- rep(20, 10)  # For example, assuming 10 extrapolated data points with quantile_T = 20
+
+# Define the level of depth_type for extrapolation
+extrap_depth_type <- "Shallow"
+
+# Calculate predicted quantile_C values using the fixed effects coefficients
+extrap_predicted_quantile_C <- intercept +
+  ifelse(extrap_depth_type == "Shallow", 
+         coeff_quantile_T_shallow * extrap_quantile_T, 
+         coeff_quantile_T_deep * extrap_quantile_T)
+
+# Display the extrapolated predicted values
+print(extrap_predicted_quantile_C)
+
+

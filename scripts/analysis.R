@@ -112,30 +112,30 @@ df_anom <- df_filtered %>%
   drop_na(z_score_temp)
 
 # Lake as a random variable
-mod_null <- lmer(data=df_anom, z_score_temp ~ 1 + (1|lake))
+mod_null_anom <- lmer(data=df_anom, z_score_temp ~ 1 + (1|lake))
 
-mod1 <- lmer(data = df_anom, z_score_temp ~ year + (1|lake))
-summary(mod1)
+mod1_anom <- lmer(data = df_anom, z_score_temp ~ year + (1|lake))
+summary(mod1_anom)
 
-hist(resid(mod1))
-plot(mod1, which = 2)
-qqnorm(resid(mod1))
-qqline(resid(mod1))
+hist(resid(mod1_anom))
+plot(mod1_anom, which = 2)
+qqnorm(resid(mod1_anom))
+qqline(resid(mod1_anom))
 
-mod_null_lm <- lm(data = df_anom, z_score_temp ~ 1)
-mod2 <- lm(data = df_anom, z_score_temp ~ year * depth_type)
-summary(mod2)
+mod_null_lm_anom <- lm(data = df_anom, z_score_temp ~ 1)
+mod2_anom <- lm(data = df_anom, z_score_temp ~ year * depth_type)
+summary(mod2_anom)
 
-hist(resid(mod2))
-plot(mod2, which = 2)
-qqnorm(resid(mod2))
-qqline(resid(mod2))
+hist(resid(mod2_anom))
+plot(mod2_anom, which = 2)
+qqnorm(resid(mod2_anom))
+qqline(resid(mod2_anom))
 # all assumptions are being met
 
 # AIC
-AIC(mod_null, mod1)
+AIC(mod_null_anom, mod1_anom)
 # mod1 and mod2 have higher AIC values than the null model
-AIC(mod_null_lm, mod2) #still higher
+AIC(mod_null_lm_anom, mod2_anom) #still higher
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
@@ -309,7 +309,7 @@ theme_lakes <- function(){
 }
 
 # Visualise Research Question 1----
-# Extract effect of year on the temperature z-score
+# Extract effect of year on the temperature
 eff1 <- effect("year", mod1)
 
 # Convert effect object to dataframe for plotting
@@ -330,7 +330,7 @@ selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (temp_plot <- ggplot() +
   geom_jitter(data = df_filtered, aes(x = year, y = temp_C, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
   labs(color = "Depth Type", shape = "Depth Type") +
-  ylab("LSWT z-score\n") +
+  ylab("LSWT (°C)\n") +
   xlab("\nyear") +
   scale_color_brewer(palette = "Dark2") +
   theme_lakes() +
@@ -340,7 +340,7 @@ selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (tempyearplot <- temp_plot +
     geom_line(data = eff_df1, aes(x = year, y = fit, linetype = "Prediction"), linewidth=.75) +
     labs(x = "\nyear", color="Depth Type",  linetype = "Legend") + 
-    ylab("LSWT z-score\n") +
+    ylab("LSWT (°C)\n") +
     scale_x_continuous(breaks = selected_years) +
     scale_linetype_manual(name="", values = "solid" ))
 
@@ -357,6 +357,44 @@ coef(mod1)$lake
     geom_line(data = cbind(df1, pred = predict(mod1)), aes(y = pred), linewidth = 1) + 
     theme_lakes()
 )
+
+# Extract effect of year on the temperature z-score
+eff1_anom <- effect("year", mod1_anom)
+
+# Convert effect object to dataframe for plotting
+eff_anom <- as.data.frame(eff1_anom)
+
+# Visualization of predictions
+(mod1_anom_predictions <- ggplot(eff_anom, aes(x = year, y = fit)) +
+    geom_point(size = 3) +
+    geom_line() +
+    scale_color_brewer(palette = "Dark2") +
+    labs(y = "Predicted temperature", x = "year") +
+    theme_lakes())
+
+ggsave(filename = 'img/mod1_anom_predictions.png', mod1_anom_predictions, 
+       device = 'png', width = 10, height = 8)
+
+selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
+(z_temp_plot <- ggplot() +
+    geom_jitter(data = df_anom, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
+    labs(color = "Depth Type", shape = "Depth Type") +
+    ylab("LSWT z-score\n") +
+    xlab("\nyear") +
+    scale_color_brewer(palette = "Dark2") +
+    theme_lakes() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_continuous(breaks = selected_years))
+
+(z_tempyearplot <- z_temp_plot +
+    geom_line(data = eff_anom, aes(x = year, y = fit, linetype = "Prediction"), linewidth=.75) +
+    labs(x = "\nyear", color="Depth Type",  linetype = "Legend") + 
+    ylab("LSWT z-score\n") +
+    scale_x_continuous(breaks = selected_years) +
+    scale_linetype_manual(name="", values = "solid" ))
+
+ggsave(filename = 'img/z_temp_year.png', tempyearplot, 
+       device = 'png', width = 8, height = 6)
 
 # Visualise Research Question 2 ----
 (tempchlaplot <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=depth_type)) +

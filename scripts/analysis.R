@@ -67,14 +67,15 @@ filtered_df <- selected_df %>%
 
 # Filter the original data frame based on the selected years
 df_filtered <- df %>%
-  filter(year %in% filtered_df$year)
+  filter(year %in% filtered_df$year) %>%
+  drop_na(temp_C)
 
 # time to run models
-# Lake as a random variable
+# Lake and year as nested random variable
 mod_null <- lmer(data=df_filtered, temp_C ~ 1 + (1|lake/year))
 
 mod1 <- lmer(data = df_filtered, temp_C ~ year + (1|lake/year))
-summary(mod1)
+summary(mod1)  # no effect present
 
 hist(resid(mod1))
 plot(mod1, which = 2)
@@ -82,7 +83,7 @@ qqnorm(resid(mod1))
 qqline(resid(mod1))
 
 mod2 <- lmer(data = df_filtered, temp_C ~ year * depth_type + (1|lake/year))
-summary(mod2)
+summary(mod2)  # no effect present
 
 hist(resid(mod2))
 plot(mod2, which = 2)
@@ -96,18 +97,20 @@ AIC(mod_null, mod1, mod2)
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
-vif(mod2) # wtf correlated
+vif(mod2) # depth type and year correlated???
 
 # Marginal and Conditional R2
 r.squaredGLMM(mod1)
 r.squaredGLMM(mod2)
 # The marginal and conditional R2 indicate that including depth type in the model
-# increases it's explanatory power but only by a very small amount
+# increases it's explanatory power but as AIC higher not better
 
-# Has the lake surface water temperature become more anomolous in two different depth regimes since 1995? 
-df_anom <- df_filtered %>%
+# Has the lake surface water temperature become more anomalous in two different depth regimes since 1995? 
+df_anom <- df %>% 
+  drop_na(temp_C) %>%
   group_by(year, lake) %>% 
-  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%
+  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%   
+  # determine z-score based on 9 observations
   ungroup() %>%
   drop_na(z_score_temp)
 
@@ -115,7 +118,7 @@ df_anom <- df_filtered %>%
 mod_null_anom <- lmer(data=df_anom, z_score_temp ~ 1 + (1|lake))
 
 mod1_anom <- lmer(data = df_anom, z_score_temp ~ year + (1|lake))
-summary(mod1_anom)
+summary(mod1_anom)  # there is a significant negative trend
 
 hist(resid(mod1_anom))
 plot(mod1_anom, which = 2)
@@ -124,7 +127,7 @@ qqline(resid(mod1_anom))
 
 mod_null_lm_anom <- lm(data = df_anom, z_score_temp ~ 1)
 mod2_anom <- lm(data = df_anom, z_score_temp ~ year * depth_type)
-summary(mod2_anom)
+summary(mod2_anom)  # no effect
 
 hist(resid(mod2_anom))
 plot(mod2_anom, which = 2)
@@ -134,18 +137,19 @@ qqline(resid(mod2_anom))
 
 # AIC
 AIC(mod_null_anom, mod1_anom)
-# mod1 and mod2 have higher AIC values than the null model
-AIC(mod_null_lm_anom, mod2_anom) #still higher
+AIC(mod_null_lm_anom, mod2_anom) 
+# both odels are not better than the null model at explaining the variation
 
 # Variance Inflation Factor
 # check for multicollinearity problem in models with multiple fixed effects
-vif(mod2) # not correlated
+vif(mod2_anom, type = 'predictor')  # year may be collinear?????
 
 # Marginal and Conditional R2
-r.squaredGLMM(mod1)
-r.squaredGLMM(mod2)
+r.squaredGLMM(mod1_anom)
+r.squaredGLMM(mod2_anom)
 # The marginal and conditional R2 indicate that including depth type in the model
 # increases it's explanatory power but only by a very small amount
+# Generally very low model fit
 
 # Research Question 2----
 # Do changes in lake surface water temperature affect the chlorophyll-a in two different depth regimes?
@@ -283,6 +287,7 @@ r.squaredGLMM(mod7) # i don't get how the conditional r2 can be higher than in t
 r.squaredGLMM(mod8)
 r.squaredGLMM(mod9)
 # adding depth type increases the marginal R2 but not the conditional R2
+coef(mod9)
 
 # are extreme events becoming more frequent
 quantiles2 <- filter(quantiles, depth_type == "shallow")
@@ -393,7 +398,7 @@ selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
     scale_x_continuous(breaks = selected_years) +
     scale_linetype_manual(name="", values = "solid" ))
 
-ggsave(filename = 'img/z_temp_year.png', tempyearplot, 
+ggsave(filename = 'img/z_temp_year.png', z_tempyearplot, 
        device = 'png', width = 8, height = 6)
 
 # Visualise Research Question 2 ----
@@ -419,7 +424,8 @@ df2$lake <- toTitleCase(df2$lake) # captitalise lake names
   labs(color="lake", shape ="lake") +
   theme_lakes() +
   theme(strip.background = element_rect(colour="black", fill="white", 
-                                        size=.25, linetype="solid"),
+                                        linewidth=.5, linetype="solid"),
+        strip.text = element_text(size = 12),
         panel.spacing = unit(2, "lines"),
         legend.position = "none")
   )
@@ -435,6 +441,19 @@ eff_df_lake <- as.data.frame(eff_lake)
 eff_df_lake$lake <- as.character(eff_df_lake$lake)
 eff_df_lake$lake <- toTitleCase(eff_df_lake$lake) # captitalise lake names
 
+# Extracting coefficients from the linear model
+intercept <- coef(lm(z_score_chla ~ z_score_temp:lake, data = df2))["(Intercept)"]
+slope_loch_leven <- coef(lm(z_score_chla ~ z_score_temp:lake, data = df2))["z_score_temp:lakeLeven"]
+
+# Printing the extracted values
+print(intercept)
+print(slope_loch_leven)
+
+
+formula_text <- paste("y = ", round(intercept, 2), " + ", 
+                      round(slope_loch_leven, 2), " * x")
+
+
 (lake_plot_effect <- tempchlaplot2 +
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
     ylab("chlorophyll-a z-score\n") +
@@ -444,6 +463,7 @@ eff_df_lake$lake <- toTitleCase(eff_df_lake$lake) # captitalise lake names
 
 ggsave(filename = 'img/lake_scatter.png', lake_plot_effect, 
        device = 'png', width = 8, height = 6)
+
 
 # facet with all points in background
 df_dif <- select(df2, -lake)
@@ -467,7 +487,7 @@ df_dif <- select(df2, -lake)
   theme_lakes() +
   theme(legend.position="none") +
   labs(x="\ndepth type",  color = "Depth Type") +
-  ylab(expression(paste("90th percentile chlorophyll-a (mg m"^" -3", ")")))
+  ylab(expression(paste("Bloom intensity (mg m"^" -3", ")")))
 ) 
 
 ggsave(filename = 'img/boxplot_extremes.png', depth_box, 
@@ -478,6 +498,23 @@ eff <- effect("quantile_T:depth_type", mod9)
 
 # Convert effect object to dataframe for plotting
 eff_df <- as.data.frame(eff)
+
+# Extract fixed effects coefficients from the model
+fixed_effects <- fixef(mod9)
+
+# Extract the intercepts for shallow and deep lakes
+intercept_shallow <- fixed_effects["(Intercept)"] + fixed_effects["quantile_T:depth_typeshallow"]
+
+# Extract coefficient for the interaction term quantile_T:depth_typeshallow
+coef_interaction_shallow <- fixed_effects["quantile_T:depth_typeshallow"]
+
+# View the coefficient
+print(coef_interaction_shallow)
+# View the intercepts
+print(intercept_shallow)
+
+formula_text <- paste("y = ", round(intercept_shallow, 2), " + ", 
+                      round(coef_interaction_shallow, 2), " * x")
 
 # Visualization of predictions
 (mod9_predictions <- ggplot(eff_df, aes(x = quantile_T, y = fit, color = depth_type, group = depth_type)) +
@@ -502,8 +539,9 @@ original_plot <- ggplot(quantiles, aes(x = quantile_T, y = quantile_C, color = d
 # Add model predictions to original data
 (combined_plot <- original_plot +
   geom_line(data = eff_df, aes(x = quantile_T, y = fit, color = depth_type), linewidth=.75) +
-  labs(x = "\n90th percentile LSWT (°C)", color = "Depth Type") + 
-  ylab(expression(paste("90th percentile chlorophyll-a (mg m"^" -3", ")"))) +
+  labs(x = "\nLake heatwave intensity (°C)", color = "Depth Type") +
+  annotate("text", x = 14, y = 75, label = formula_text, color = "black", size = 4, hjust = 0, vjust = 0) +
+  ylab(expression(paste("Bloom intensity (mg m"^" -3", ")"))) +
   scale_linetype_manual(name="", values = "solid" )
   )
 

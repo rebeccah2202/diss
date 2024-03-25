@@ -17,6 +17,7 @@ library(lubridate) # determine day of year
 library(viridis)
 library(tools) # to capitalise
 library(patchwork) # make panel of plots
+library(cowplot)
 
 # Summary statistics----
 df <- read.csv("data/all.csv")
@@ -115,7 +116,7 @@ df_anom <- df %>%
   drop_na(z_score_temp)
 
 # Lake as a random variable
-mod_null_anom <- lmer(data=df_anom, z_score_temp ~ 1 + (1|lake))
+mod_null_anom <- lmer(data = df_anom, z_score_temp ~ 1 + (1|lake))
 
 mod1_anom <- lmer(data = df_anom, z_score_temp ~ year + (1|lake))
 summary(mod1_anom)  # there is a significant negative trend
@@ -161,7 +162,8 @@ df2 <- df %>%
   filter(year > 2001) %>%    # there is only chlorophyll-a data after 2001
   group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%
   mutate(z_score_chla=roll_scale(mean_chla, width=10)) %>%
-  ungroup()
+  ungroup() %>%
+  drop_na(z_score_temp, z_score_chla)
 
 # Models
 # I am including lake as a random effect as chlorophyll concentrations differ noticeably between them
@@ -452,7 +454,7 @@ print(slope_loch_leven)
 
 formula_text <- paste("y = ", round(intercept, 2), " + ", 
                       round(slope_loch_leven, 2), " * x")
-
+print(formula_text)
 
 (lake_plot_effect <- tempchlaplot2 +
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
@@ -597,9 +599,12 @@ ggsave(filename = 'img/boxplot_chla.png', chla_boxplot,
 ggsave(filename = 'img/boxplot_temp.png', temp_boxplot, 
        device = 'png', width = 8, height = 6)
 
-
 # Combine the plots into a panel
-(panel_plot <- chla_boxplot + temp_boxplot + plot_layout(ncol = 2))
+(panel_plot <- plot_grid(chla_boxplot + theme(legend.position="none"),
+                         temp_boxplot + theme(legend.position="none"),
+                         align = 'vh',
+                         labels = c("A", "B", size = 12)
+                         ))
 
 # Save the panel plot
 ggsave(filename = 'img/panel_boxplots.png', panel_plot, 

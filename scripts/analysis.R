@@ -16,7 +16,6 @@ library(RColorBrewer)
 library(lubridate) # determine day of year
 library(viridis)
 library(tools) # to capitalise
-library(patchwork) # make panel of plots
 library(cowplot)
 
 # Summary statistics----
@@ -107,7 +106,7 @@ r.squaredGLMM(mod2)
 # increases it's explanatory power but as AIC higher not better
 
 # Has the lake surface water temperature become more anomalous in two different depth regimes since 1995? 
-df_anom <- df %>% 
+df_anom <- df_filtered %>% 
   drop_na(temp_C) %>%
   group_by(year, lake) %>% 
   mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%   
@@ -147,7 +146,6 @@ vif(mod2_anom, type = 'predictor')  # year may be collinear?????
 
 # Marginal and Conditional R2
 r.squaredGLMM(mod1_anom)
-r.squaredGLMM(mod2_anom)
 # The marginal and conditional R2 indicate that including depth type in the model
 # increases it's explanatory power but only by a very small amount
 # Generally very low model fit
@@ -171,6 +169,7 @@ df2 <- df %>%
 mod_null2 <- lmer(data = df2, z_score_chla ~ 1 + (1|lake))
 
 mod4 <- lmer(data = df2, z_score_chla ~ z_score_temp + (1|lake))
+bartlett.test(z_score_chla ~ z_score_temp + (1|lake), data=df2)
 summary(mod4)
 
 hist(resid(mod4))
@@ -258,7 +257,7 @@ mod_null3 <- lmer(data = quantiles, quantile_C ~ 1 + (1|lake))
 mod7 <- lmer(data = quantiles, quantile_C ~ quantile_T + (1|lake))
 summary(mod7)
 hist(resid(mod7))
-plot(mod7, which = 2) # does this indicate homoscedasticity?
+plot(mod7, which = 2)
 qqnorm(resid(mod7))
 qqline(resid(mod7))
 
@@ -609,39 +608,3 @@ ggsave(filename = 'img/boxplot_temp.png', temp_boxplot,
 # Save the panel plot
 ggsave(filename = 'img/panel_boxplots.png', panel_plot, 
        device = 'png', width = 12, height = 6)
-
-
-
-# Potential additions----
-(plot <- ggplot(quantiles, aes(x = year, y = quantile_T, color = depth_type, shape = depth_type)) +
-  scale_color_brewer(palette = "Dark2") +
-  labs(color="Depth Type", shape ="Depth Type") +
-  geom_point(size = 2) +
-  theme_lakes() +
-  theme())
-
-mod <- lmer(data = quantiles, quantile_T ~ year+ (1|lake))
-summary(mod)
-
-
-# Fixed effects coefficients from mod9
-intercept <- 15.4894
-coeff_quantile_T_deep <- 0.2292
-coeff_quantile_T_shallow <- 3.2910
-
-# Define extrapolated quantile_T values
-extrap_quantile_T <- rep(20, 10)  # For example, assuming 10 extrapolated data points with quantile_T = 20
-
-# Define the level of depth_type for extrapolation
-extrap_depth_type <- "Shallow"
-
-# Calculate predicted quantile_C values using the fixed effects coefficients
-extrap_predicted_quantile_C <- intercept +
-  ifelse(extrap_depth_type == "Shallow", 
-         coeff_quantile_T_shallow * extrap_quantile_T, 
-         coeff_quantile_T_deep * extrap_quantile_T)
-
-# Display the extrapolated predicted values
-print(extrap_predicted_quantile_C)
-
-

@@ -4,6 +4,7 @@
 library(tidyverse)
 library(hrbrthemes)
 library(viridis)
+library(lubridate)
 
 # Combine all data into one dataframe----
 # load data
@@ -67,6 +68,7 @@ total %>%
 
 # Calculate frequency of observations----
 # for each lake for each time period
+total <- read.csv("data/all.csv")
 summary_stats <- total %>%
   subset(select = c(year, lake, mean_chla)) %>%
   na.omit() %>%
@@ -120,3 +122,42 @@ percentile
 
 
   
+# Check out sensitivity of z-score to window size
+df <- read.csv("data/all.csv")
+df3 <- df %>%
+  drop_na(temp_C) %>%
+  group_by(year, lake) %>% 
+  mutate("3" = roll_scale(temp_C, width = 3)) %>%
+  mutate("5" = roll_scale(temp_C, width = 5)) %>%
+  mutate("7" = roll_scale(temp_C, width = 7)) %>%
+  mutate("9" = roll_scale(temp_C, width = 9)) %>%
+  ungroup() %>%
+  select("3","5","7", "9") %>%
+  gather(window_width, z_score_temp)
+
+(p <- ggplot(df3, aes(x=z_score_temp)) + 
+    geom_histogram(binwidth=0.5, fill="#CD2626", color="#e9ecef", alpha=0.9) +
+    facet_wrap(~window_width) +
+    labs(x ="\nz score temperature", y="count\n") +
+    theme_lakes() +
+    theme( panel.spacing = unit(2, "lines"))
+  )
+
+df4 <- df %>%
+  drop_na(mean_chla) %>%
+  group_by(year, lake) %>% 
+  mutate("3" = roll_scale(mean_chla, width = 3)) %>%
+  mutate("5" = roll_scale(mean_chla, width = 5)) %>%
+  mutate("7" = roll_scale(mean_chla, width = 7)) %>%
+  mutate("9" = roll_scale(mean_chla, width = 9)) %>%
+  ungroup() %>%
+  select("3","5","7", "9") %>%
+  gather(window_width, z_score_chla)
+
+(p <- ggplot(df4, aes(x=z_score_chla)) + 
+    geom_histogram(binwidth=0.5, fill="#9BCD9B", color="#e9ecef", alpha=0.9) +
+    facet_wrap(~window_width) +
+    labs(x ="\nz score Chlorophyll-a", y="count\n") +
+    theme_lakes() +
+    theme( panel.spacing = unit(2, "lines"))
+)

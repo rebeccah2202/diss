@@ -74,7 +74,7 @@ df_filtered <- df %>%
 # Lake and year as nested random variable
 mod_null <- lmer(data=df_filtered, temp_C ~ 1 + (1|lake/year))
 
-mod1 <- lmer(data = df_filtered, temp_C ~ year + (1|lake/year))
+mod1 <- glm(data = df_filtered, temp_C ~ year)
 summary(mod1)  # no effect present
 
 residuals <- resid(mod1)
@@ -97,10 +97,6 @@ hist(resid(mod2))
 plot(mod2, which = 2)
 qqnorm(resid(mod2))
 qqline(resid(mod2))
-<<<<<<< HEAD
-=======
-# all assumptions are being met
->>>>>>> 147abd211fb712beee09fc380be847e10bd2a914
 
 # AIC
 AIC(mod_null, mod1, mod2)
@@ -123,13 +119,7 @@ df_anom <- df_filtered %>%
   mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%   
   # determine z-score based on 9 observations
   ungroup() %>%
-<<<<<<< HEAD
   drop_na(z_score_temp) 
-
-df_variation <- select(df_anom, date, temp_C, lake, z_score_temp)
-=======
-  drop_na(z_score_temp)
->>>>>>> 147abd211fb712beee09fc380be847e10bd2a914
 
 # Lake as a random variable
 mod_null_anom <- lmer(data = df_anom, z_score_temp ~ 1 + (1|lake))
@@ -219,11 +209,8 @@ plot(mod_lake, which = 2)
 qqnorm(resid(mod_lake))
 qqline(resid(mod_lake))
 
-<<<<<<< HEAD
 residualslake <- residuals(mod_lake)
 shapiro.test(residualslake)
-=======
->>>>>>> 147abd211fb712beee09fc380be847e10bd2a914
 
 # AIC
 AIC(mod_null2, mod4, mod5, mod6, mod_lake) # none of the models explains more than the null model

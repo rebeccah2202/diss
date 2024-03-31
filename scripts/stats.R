@@ -58,13 +58,8 @@ ggplot(yearly_summary, aes(x = year)) +
 # Rolling z-score----
 df <- read.csv("data/all.csv")
 df3 <- df %>%
-<<<<<<< HEAD
   drop_na(mean_chla) %>%
   group_by(year, lake) %>% mutate(z_score_temp = roll_scale(mean_chla, width = 9)) %>%
-=======
-  drop_na(temp_C) %>%
-  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 11)) %>%
->>>>>>> 147abd211fb712beee09fc380be847e10bd2a914
   mutate(depth_type = case_when(
     lake %in% c("lomond", "ness") ~ "deep",
     lake %in% c("leven", "neagh") ~ "shallow",

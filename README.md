@@ -1,4 +1,4 @@
-## Blooms like it hot and shallow
+## $${\color{red}Blooms  \space like  \space it  \space hot  \space and  \space shallow  \space :fire: }$$
 
 Dissertation in Ecological and Environmental Sciences 23/24       
 Rebecca Hies   
@@ -20,5 +20,5 @@ Main plots:
 [Heatwave and bloom intensity](/img/extremes.png)   
 
 **Image of a phytoplankton bloom in Loch Leven, 2022:**   
-![algal_bloom_Loch_Leven](https://github.com/rebeccah2202/diss/assets/114161047/879a3bb4-05e1-48fb-98b0-092f62d453b2)
+![algal_bloom_Loch_Leven](https://github.com/rebeccah2202/diss/assets/114161047/879a3bb4-05e1-48fb-98b0-092f62d453b2)   
 Photo taken by Linda May [*photo credit*](https://www.ceh.ac.uk/press/loch-leven-monitoring-online-portal)   

@@ -21,4 +21,7 @@ Main plots:
 [LSWT z-score effect on chlorophyll-a z-score](/img/lake_scatter.png)   
 [Heatwave and bloom intensity](/img/extremes.png)   
 
-
+**Image of a phytoplankton bloom in Loch Leven, 2022:**   
+![image](![algal_bloom_Loch_Leven_2022_250px](https://github.com/rebeccah2202/diss/assets/114161047/81032ae5-bdf4-4d8d-9b4a-b5df791687e1)
+)   
+Photo taken by Linda May [*photo credit*](https://www.ceh.ac.uk/press/loch-leven-monitoring-online-portal)   

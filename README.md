@@ -10,7 +10,7 @@ contact: rebhie21@gmail.com
    
 [Data download with Google collaboratory](/nc_file_bylakeid.ipynb)    
 Extract NetCDF files using r: [chlorophyll-a](/scripts/loop_ncs.R), [lake surface water temperature](/scripts/loop_temp.R)   
-[Data mainpulation](/scripts/data_manip.R)   
+[Data manipulation](/scripts/data_manip.R)   
 Main plots:   
 [Boxplots for chlorophyll-a and LSWT](/img/panel_boxplots.png)   
 [LSWT trend over time](/img/temp_year.png)   

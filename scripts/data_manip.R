@@ -122,7 +122,7 @@ percentile
 
 
   
-# Check out sensitivity of z-score to window size
+# Check out sensitivity of z-score to window size----
 df <- read.csv("data/all.csv")
 df3 <- df %>%
   drop_na(temp_C) %>%
@@ -131,17 +131,22 @@ df3 <- df %>%
   mutate("5" = roll_scale(temp_C, width = 5)) %>%
   mutate("7" = roll_scale(temp_C, width = 7)) %>%
   mutate("9" = roll_scale(temp_C, width = 9)) %>%
+  mutate("11" = roll_scale(temp_C, width = 11)) %>%
   ungroup() %>%
-  select("3","5","7", "9") %>%
-  gather(window_width, z_score_temp)
+  select("3","5","7", "9", "11") %>%
+  gather(window_width, z_score_temp) %>%
+  mutate(window_width = factor(window_width, levels = c("3", "5", "7", "9", "11")))
 
 (p <- ggplot(df3, aes(x=z_score_temp)) + 
     geom_histogram(binwidth=0.5, fill="#CD2626", color="#e9ecef", alpha=0.9) +
-    facet_wrap(~window_width) +
-    labs(x ="\nz score temperature", y="count\n") +
+    facet_grid(~window_width) +
+    labs(x ="\nLSWT z-score", y="count\n") +
     theme_lakes() +
     theme( panel.spacing = unit(2, "lines"))
   )
+
+ggsave(filename = 'img/temp_sensitivity.png', p, 
+       device = 'png', width = 8, height = 4)
 
 df4 <- df %>%
   drop_na(mean_chla) %>%
@@ -150,14 +155,19 @@ df4 <- df %>%
   mutate("5" = roll_scale(mean_chla, width = 5)) %>%
   mutate("7" = roll_scale(mean_chla, width = 7)) %>%
   mutate("9" = roll_scale(mean_chla, width = 9)) %>%
+  mutate("11" = roll_scale(mean_chla, width = 11)) %>%
   ungroup() %>%
-  select("3","5","7", "9") %>%
-  gather(window_width, z_score_chla)
+  select("3","5","7", "9", "11") %>%
+  gather(window_width, z_score_chla) %>%
+  mutate(window_width = factor(window_width, levels = c("3", "5", "7", "9", "11")))
 
-(p <- ggplot(df4, aes(x=z_score_chla)) + 
+(p2 <- ggplot(df4, aes(x=z_score_chla)) + 
     geom_histogram(binwidth=0.5, fill="#9BCD9B", color="#e9ecef", alpha=0.9) +
-    facet_wrap(~window_width) +
-    labs(x ="\nz score Chlorophyll-a", y="count\n") +
+    facet_grid(~window_width) +
+    labs(x ="\nchlorophyll-a z-score", y="count\n") +
     theme_lakes() +
     theme( panel.spacing = unit(2, "lines"))
 )
+
+ggsave(filename = 'img/chla_sensitivity.png', p2, 
+       device = 'png', width = 8, height = 4)

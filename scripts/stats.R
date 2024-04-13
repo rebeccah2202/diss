@@ -58,15 +58,14 @@ ggplot(yearly_summary, aes(x = year)) +
 # Rolling z-score----
 df <- read.csv("data/all.csv")
 df3 <- df %>%
-  drop_na(mean_chla) %>%
-  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(mean_chla, width = 9)) %>%
+  drop_na(temp_C) %>%
+  group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 7)) %>%
   mutate(depth_type = case_when(
     lake %in% c("lomond", "ness") ~ "deep",
     lake %in% c("leven", "neagh") ~ "shallow",
   ))
 
 hist(df3$z_score_temp)
-install.packages("colourpicker")
 (p <- ggplot(df3, aes(x=z_score_temp)) + 
   geom_histogram(binwidth=0.5, fill="#CD2626", color="#e9ecef", alpha=0.9) +
   theme_lakes())
@@ -441,10 +440,6 @@ indiv_lake %>%
 # colour palettes----
 library(RColorBrewer)
 display.brewer.all(colorblindFriendly = TRUE)
-      
-
-# determine suitable z-score----
-# Temperature
 
 # Yearly z-score ----
 # calculate z score
@@ -488,6 +483,7 @@ df3 <- df %>%
   drop_na(temp_C) %>%
   group_by(year, lake) %>% mutate(z_score_temp = roll_scale(temp_C, width = 9))
 
+library(grid)
 grob <- grobTree(textGrob("width=9", x=0.1,  y=0.95, hjust=0,
                           gp=gpar(col="black", fontsize=13)))
 

@@ -54,7 +54,8 @@ df <- read.csv("data/all.csv")
 df <- df %>%
   mutate(year = year(date),
          month = month(date, label = TRUE)) %>%
-  filter(!month=="Mar")
+  filter(!month=="Mrz")  # so confused, i think that the code will change the month names depending on the language
+# so when I was using a UK laptop it was "Mar" and now with my German laptop it is "Mrz" short for März
 
 selected_df <- df[, c("temp_C", "date", "month", "lake", "year", "depth_type")]
 
@@ -68,13 +69,17 @@ filtered_df <- selected_df %>%
 # Filter the original data frame based on the selected years
 df_filtered <- df %>%
   filter(year %in% filtered_df$year) %>%
-  drop_na(temp_C)
+  drop_na(temp_C) %>%
+  mutate(log_T=log(temp_C),               # i tried different transformations which did not improve the assumptions, also log transformation removed negative values
+         sqrt_T=sqrt(temp_C),
+         quad_T=sqrt(sqrt(temp_C))) %>%
+  ungroup()
 
 # time to run models
 # Lake and year as nested random variable
 mod_null <- lmer(data=df_filtered, temp_C ~ 1 + (1|lake/year))
 
-mod1 <- glm(data = df_filtered, temp_C ~ year)
+mod1 <- lmer(data = df_filtered, temp_C ~ year + (1|lake/year))
 summary(mod1)  # no effect present
 
 residuals <- resid(mod1)
@@ -87,7 +92,8 @@ curve(dnorm(x, mean = residual_mean, sd = residual_sd),
 # I think the histogram is acceptable
 
 plot(mod1, which = 2) # fine, no underlining patterns
-qqnorm(resid(mod1)) # a little bit dodgy towards the top, right corner, probably still okay though
+qqnorm(resid(mod1)) # a little bit dodgy towards the top, right corner, slightly left skewed
+# no transformations have helped
 qqline(resid(mod1))
 
 mod2 <- lmer(data = df_filtered, temp_C ~ year * depth_type + (1|lake/year))
@@ -112,14 +118,21 @@ r.squaredGLMM(mod2)
 # The marginal and conditional R2 indicate that including depth type in the model
 # increases it's explanatory power but as AIC higher not better
 
-# Has the lake surface water temperature become more anomalous in two different depth regimes since 1995? 
+# Has the lake surface water temperature become more anomalous in two different depth regimes since 1995?
+library(zoo)
 df_anom <- df_filtered %>% 
   drop_na(temp_C) %>%
   group_by(year, lake) %>% 
-  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%   
+  mutate(z_score_temp = roll_scale(temp_C, width = 9),
+         rolling_sd = rollapply(temp_C, width = 9, FUN = sd, fill = NA, align = "right")) %>%   
   # determine z-score based on 9 observations
   ungroup() %>%
   drop_na(z_score_temp) 
+
+variance <- df_filtered %>% 
+  group_by(year) %>%
+  summarise(max = max(temp_C),
+         min = min(temp_C))
 
 # Lake as a random variable
 mod_null_anom <- lmer(data = df_anom, z_score_temp ~ 1 + (1|lake))
@@ -133,7 +146,7 @@ qqnorm(resid(mod1_anom))
 qqline(resid(mod1_anom))
 
 mod_null_lm_anom <- lm(data = df_anom, z_score_temp ~ 1)
-mod2_anom <- lm(data = df_anom, z_score_temp ~ year * depth_type)
+mod2_anom <- lm(data = df_anom, rolling_sd ~ year : depth_type)
 summary(mod2_anom)  # no effect
 
 hist(resid(mod2_anom))
@@ -169,6 +182,12 @@ df2 <- df %>%
   mutate(z_score_chla=roll_scale(mean_chla, width=10)) %>%
   ungroup() %>%
   drop_na(z_score_temp, z_score_chla)
+
+df2$lake <- dplyr::recode(df2$lake, Leven = 'Loch Leven', 
+                          Lomond = 'Loch Lomond',
+                          Ness = 'Loch Ness',
+                          Neagh = 'Lough Neagh')
+
 
 # Models
 # I am including lake as a random effect as chlorophyll concentrations differ noticeably between them
@@ -347,7 +366,8 @@ ggsave(filename = 'img/mod1_predictions.png', mod1_predictions,
 
 selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (temp_plot <- ggplot() +
-  geom_jitter(data = df_filtered, aes(x = year, y = temp_C, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
+  geom_jitter(data = df_filtered, aes(x = year, y = temp_C, color = depth_type, shape = depth_type, group = depth_type),
+              size = 1.5, alpha = 0.9, position = position_jitterdodge(dodge.width = 0.7)) +
   labs(color = "Depth Type", shape = "Depth Type") +
   ylab("LSWT (°C)\n") +
   xlab("\nyear") +
@@ -364,7 +384,7 @@ selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
     scale_linetype_manual(name="", values = "solid" ))
 
 ggsave(filename = 'img/temp_year.png', tempyearplot, 
-       device = 'png', width = 8, height = 6)
+       device = 'png', width = 9, height = 6)
 
 # Visualise random effect
 coef(mod1)$lake
@@ -383,6 +403,23 @@ eff1_anom <- effect("year", mod1_anom)
 # Convert effect object to dataframe for plotting
 eff_anom <- as.data.frame(eff1_anom)
 
+# Extract fixed effects coefficients from the model
+fixed_effects2 <- fixef(mod1_anom)
+
+# Extract the intercepts for shallow and deep lakes
+intercept_z <- fixed_effects2["(Intercept)"] + fixed_effects2["year"]
+
+# Extract coefficient for the interaction term quantile_T:depth_typeshallow
+coef_z <- fixed_effects["year"]
+
+# View the coefficient
+print(coef_z)
+# View the intercepts
+print(intercept_z)
+
+formula_text2 <- paste("y = ", round(intercept_z, 2), " + ", 
+                      round(coef_z, 2), " * x")
+
 # Visualization of predictions
 (mod1_anom_predictions <- ggplot(eff_anom, aes(x = year, y = fit)) +
     geom_point(size = 3) +
@@ -396,7 +433,8 @@ ggsave(filename = 'img/mod1_anom_predictions.png', mod1_anom_predictions,
 
 selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (z_temp_plot <- ggplot() +
-    geom_jitter(data = df_anom, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), size = 1.5, width=0.5, height=0.2) +
+    geom_jitter(data = df_anom, aes(x = year, y = z_score_temp, color = depth_type, shape = depth_type, group = depth_type), 
+                size = 1.5, alpha = 0.9, position = position_jitterdodge(dodge.width = 0.7)) +
     labs(color = "Depth Type", shape = "Depth Type") +
     ylab("LSWT z-score\n") +
     xlab("\nyear") +
@@ -413,7 +451,7 @@ selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
     scale_linetype_manual(name="", values = "solid" ))
 
 ggsave(filename = 'img/z_temp_year.png', z_tempyearplot, 
-       device = 'png', width = 8, height = 6)
+       device = 'png', width = 9, height = 6)
 
 # Visualise Research Question 2 ----
 (tempchlaplot <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=depth_type)) +
@@ -428,20 +466,21 @@ ggsave(filename = 'img/temp_chla.png', tempchlaplot,
        device = 'png', width = 8, height = 6)
 
 # colour by lake
-df2$lake <- toTitleCase(df2$lake) # captitalise lake names
 (tempchlaplot2 <- ggplot(df2, aes(x=z_score_temp, y=z_score_chla, color=lake)) +
   geom_point(aes(shape = lake), size=1.25) +
   facet_wrap(~lake) +
-  scale_color_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
+  scale_color_viridis(option="turbo", discrete = TRUE) +
   ylab("chlorophyll-a z-score\n") +
   xlab("\nLSWT z-score") +
   labs(color="lake", shape ="lake") +
   theme_lakes() +
   theme(strip.background = element_rect(colour="black", fill="white", 
-                                        linewidth=.5, linetype="solid"),
+                                        linetype="solid"),
         strip.text = element_text(size = 12),
         panel.spacing = unit(2, "lines"),
-        legend.position = "none")
+        legend.position = "none",
+        panel.border = element_rect(color = "black", 
+                                    fill = NA))
   )
 
 
@@ -472,7 +511,7 @@ print(formula_text)
     geom_line(data = eff_df_lake, aes(x = z_score_temp, y = fit), linewidth=.75) +
     ylab("chlorophyll-a z-score\n") +
     xlab("\nLSWT z-score") +
-    scale_color_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
+    scale_color_viridis(option="turbo", discrete = TRUE) +
     scale_linetype_manual(name="", values = "solid" ))
 
 ggsave(filename = 'img/lake_scatter.png', lake_plot_effect, 
@@ -584,13 +623,17 @@ coef(mod9)$lake
 
 # Chlorophyll-a boxplot
 # Load the tools package
-df$lake <- toTitleCase(df$lake) 
+df$lake <- dplyr::recode(df$lake, leven = 'Loch Leven', 
+                          lomond = 'Loch Lomond',
+                          ness = 'Loch Ness',
+                          neagh = 'Lough Neagh')
 
 (chla_boxplot <- ggplot(df,aes(x=lake, y=mean_chla, fill=lake)) +
   geom_boxplot() +
   scale_fill_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
   theme_lakes() +
-  theme(legend.position="none") +
+  theme(legend.position="none",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
   ylab(expression(paste("chlorophyll-a concentration (mg m"^" -3", ")"))) +
   xlab(""))
 
@@ -603,7 +646,8 @@ ggsave(filename = 'img/boxplot_chla.png', chla_boxplot,
     scale_fill_viridis(option="turbo", discrete = TRUE, alpha=0.6) +
     theme_lakes() +
     theme(
-      legend.position="none"
+      legend.position="none",
+      axis.text.x = element_text(angle = 45, hjust = 1)
     ) +
     ylab("LSWT (°C)\n") +
     xlab(""))

@@ -80,7 +80,9 @@ df_filtered <- df %>%
 mod_null <- lmer(data=df_filtered, temp_C ~ 1 + (1|lake/year))
 
 mod1 <- lmer(data = df_filtered, temp_C ~ year + (1|lake/year))
+mod_glm <- glmer(data = df_filtered, temp_C ~ year + (1|lake/year))
 summary(mod1)  # no effect present
+summary(mod_glm) # also no effect present when I use a generalised linear model
 
 residuals <- resid(mod1)
 hist(residuals, freq = FALSE, main = "Histogram of Residuals", xlab = "Residuals")
@@ -119,12 +121,10 @@ r.squaredGLMM(mod2)
 # increases it's explanatory power but as AIC higher not better
 
 # Has the lake surface water temperature become more anomalous in two different depth regimes since 1995?
-library(zoo)
 df_anom <- df_filtered %>% 
   drop_na(temp_C) %>%
   group_by(year, lake) %>% 
-  mutate(z_score_temp = roll_scale(temp_C, width = 9),
-         rolling_sd = rollapply(temp_C, width = 9, FUN = sd, fill = NA, align = "right")) %>%   
+  mutate(z_score_temp = roll_scale(temp_C, width = 9)) %>%   
   # determine z-score based on 9 observations
   ungroup() %>%
   drop_na(z_score_temp) 
@@ -143,7 +143,7 @@ summary(mod1_anom)  # there is a significant negative trend
 hist(resid(mod1_anom))
 plot(mod1_anom, which = 2)
 qqnorm(resid(mod1_anom))
-qqline(resid(mod1_anom))
+qqline(resid(mod1_anom))  # general problem that temperature data is a bit skewed
 
 mod_null_lm_anom <- lm(data = df_anom, z_score_temp ~ 1)
 mod2_anom <- lm(data = df_anom, rolling_sd ~ year : depth_type)
@@ -195,7 +195,6 @@ df2$lake <- dplyr::recode(df2$lake, Leven = 'Loch Leven',
 mod_null2 <- lmer(data = df2, z_score_chla ~ 1 + (1|lake))
 
 mod4 <- lmer(data = df2, z_score_chla ~ z_score_temp + (1|lake))
-bartlett.test(z_score_chla ~ z_score_temp + (1|lake), data=df2)
 summary(mod4)
 
 hist(resid(mod4))
@@ -446,6 +445,7 @@ selected_years <- c(1995, 1999, 2003, 2007, 2011, 2016, 2020)
 (z_tempyearplot <- z_temp_plot +
     geom_line(data = eff_anom, aes(x = year, y = fit, linetype = "Prediction"), linewidth=.75) +
     labs(x = "\nyear", color="Depth Type",  linetype = "Legend") + 
+    annotate("text", x = 14, y = 75, label = formula_text, color = "black", size = 4, hjust = 0, vjust = 0) +
     ylab("LSWT z-score\n") +
     scale_x_continuous(breaks = selected_years) +
     scale_linetype_manual(name="", values = "solid" ))
